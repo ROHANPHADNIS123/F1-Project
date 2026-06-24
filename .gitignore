@@ -1,0 +1,24 @@
+# Cache folder
+f1_cache/
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# Python cache files
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Frontend graphs / generated files
+frontend/graphs/
+
+# Environment variables (secret files)
+.env
+backend/.env
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+fastf1
+pandas
+numpy
+matplotlib
+requests
+python-dotenv
+groq

@@ -33,7 +33,6 @@ body {
     gap: 20px;
 }
 
-/* Glassmorphism Utility */
 .glass-panel {
     background: var(--glass-bg);
     backdrop-filter: blur(16px);
@@ -42,7 +41,6 @@ body {
     border-radius: 16px;
 }
 
-/* Sidebar */
 .sidebar {
     width: 250px;
     display: flex;
@@ -65,33 +63,115 @@ body {
 .icon-red { color: var(--f1-red); }
 .icon-green { color: var(--accent-green); font-size: 0.6em; margin-right: 4px; vertical-align: middle;}
 
-.nav-menu {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    flex-grow: 1;
-}
-
-.nav-menu a {
-    text-decoration: none;
-    color: var(--text-secondary);
+.new-chat-btn {
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--glass-border);
     padding: 12px 16px;
-    border-radius: 8px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: center;
+    gap: 8px;
     transition: all 0.3s ease;
+    width: 100%;
 }
 
-.nav-menu a:hover {
+.new-chat-btn:hover {
+    background: var(--f1-red);
+    border-color: var(--f1-red);
+    box-shadow: 0 0 15px rgba(225, 6, 0, 0.4);
+}
+
+.chat-history-container {
+    flex-grow: 1;
+    margin: 24px 0;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.chat-history-container::-webkit-scrollbar {
+    width: 4px;
+}
+.chat-history-container::-webkit-scrollbar-thumb {
     background: rgba(255,255,255,0.05);
-    color: var(--text-primary);
+    border-radius: 2px;
 }
 
-.nav-menu a.active {
-    background: linear-gradient(90deg, rgba(225,6,0,0.15) 0%, transparent 100%);
+.history-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+
+.chat-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.chat-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+}
+
+.chat-list-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-primary);
+    border-color: var(--glass-border);
+}
+
+.chat-list-item.active {
+    background: linear-gradient(90deg, rgba(225, 6, 0, 0.1) 0%, transparent 100%);
     color: var(--f1-red);
     border-left: 3px solid var(--f1-red);
+    padding-left: 9px;
+}
+
+.chat-list-item span {
+    flex-grow: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.delete-chat-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    opacity: 0;
+    cursor: pointer;
+    padding: 4px;
+    transition: opacity 0.2s ease, color 0.2s ease;
+    font-size: 0.85rem;
+}
+
+.chat-list-item:hover .delete-chat-btn {
+    opacity: 0.7;
+}
+
+.chat-list-item:hover .delete-chat-btn:hover {
+    opacity: 1;
+    color: var(--f1-red);
 }
 
 .user-profile {
@@ -136,7 +216,6 @@ body {
     color: var(--text-secondary);
 }
 
-/* Chat History */
 .chat-history {
     flex-grow: 1;
     overflow-y: auto;
@@ -147,7 +226,6 @@ body {
     scroll-behavior: smooth;
 }
 
-/* Scrollbar styling */
 .chat-history::-webkit-scrollbar {
     width: 6px;
 }
@@ -255,3 +333,112 @@ body {
     0%, 80%, 100% { transform: scale(0); }
     40% { transform: scale(1); }
 }
+
+/* Telemetry and Lap Time Graphs */
+.graph-container {
+    margin-top: 12px;
+    width: 100%;
+    max-width: 600px;
+    overflow: hidden;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.graph-container img {
+    width: 100%;
+    height: auto;
+    display: block;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.graph-container img:hover {
+    transform: scale(1.01);
+}
+
+/* Fullscreen modal for expanding graphs */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(15, 17, 21, 0.95);
+    backdrop-filter: blur(8px);
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    margin: auto;
+    display: block;
+    max-width: 90%;
+    max-height: 90%;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.6);
+    animation: zoomIn 0.3s ease;
+}
+
+@keyframes zoomIn {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.close-modal {
+    position: absolute;
+    top: 30px;
+    right: 45px;
+    color: var(--text-secondary);
+    font-size: 40px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.close-modal:hover {
+    color: var(--text-primary);
+}
+
+/* Glassmorphic Tables */
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    margin-top: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+}
+
+.f1-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.95rem;
+}
+
+.f1-table th {
+    background: rgba(225, 6, 0, 0.15);
+    color: var(--f1-red);
+    font-weight: 600;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.f1-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+}
+
+.f1-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.f1-table tbody tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+}
+

@@ -8,7 +8,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -19,12 +18,19 @@
                 <i class="fa-solid fa-flag-checkered icon-red"></i>
                 <h2>F1 AI</h2>
             </div>
-            <nav class="nav-menu">
-                <a href="#" class="active"><i class="fa-solid fa-comment-dots"></i> Chat</a>
-                <a href="#"><i class="fa-solid fa-chart-line"></i> Telemetry</a>
-                <a href="#"><i class="fa-solid fa-trophy"></i> Standings</a>
-                <a href="#"><i class="fa-solid fa-gear"></i> Settings</a>
-            </nav>
+            <!-- New Chat Button -->
+            <button id="new-chat-btn" class="new-chat-btn">
+                <i class="fa-solid fa-plus"></i> New Chat
+            </button>
+            
+            <!-- Chat History List -->
+            <div class="chat-history-container">
+                <div class="history-label">Previous Chats</div>
+                <div class="chat-list" id="chat-list">
+                    <!-- Labeled chats will be dynamically rendered here -->
+                </div>
+            </div>
+
             <div class="user-profile">
                 <div class="avatar"><i class="fa-solid fa-user"></i></div>
                 <span>Guest User</span>
@@ -55,6 +61,12 @@
                 <button id="send-btn" class="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
             </div>
         </main>
+    </div>
+
+    <!-- Modal for Graph Expansion -->
+    <div id="graph-modal" class="modal">
+        <span class="close-modal">&times;</span>
+        <img class="modal-content" id="expanded-graph">
     </div>
 
     <script src="/static/app.js"></script>
