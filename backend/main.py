@@ -3,9 +3,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+import os
+import sys
+
+# Ensure backend directory is in sys.path so imports work regardless of execution directory
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+if backend_dir not in sys.path:
+    sys.path.append(backend_dir)
+
 from agent import ask_f1_agent
 from dotenv import load_dotenv
-import os
 import subprocess
 import requests
 import base64
