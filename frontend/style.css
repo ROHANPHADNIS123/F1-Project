@@ -43,9 +43,65 @@ body {
 
 .sidebar {
     width: 250px;
+    min-width: 250px;
     display: flex;
     flex-direction: column;
     padding: 24px;
+    transition: width 0.3s ease, min-width 0.3s ease, padding 0.3s ease;
+    overflow: hidden;
+}
+
+/* Collapsed state */
+.sidebar.collapsed {
+    width: 68px;
+    min-width: 68px;
+    padding: 24px 14px;
+}
+
+/* Hide text elements when collapsed */
+.sidebar.collapsed .sidebar-text {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: opacity 0.2s ease, width 0.2s ease;
+}
+
+.sidebar-text {
+    opacity: 1;
+    transition: opacity 0.25s ease;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+/* Toggle button */
+.sidebar-toggle {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    margin-left: auto;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sidebar-toggle:hover {
+    color: var(--f1-red);
+    background: rgba(225, 6, 0, 0.1);
+}
+
+.sidebar.collapsed .sidebar-toggle i {
+    transform: rotate(180deg);
+}
+
+.sidebar-toggle i {
+    transition: transform 0.3s ease;
+    font-size: 0.85rem;
 }
 
 .brand {
@@ -177,6 +233,7 @@ body {
 .user-profile {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
     margin-top: auto;
 }
@@ -442,3 +499,250 @@ body {
     background: rgba(255, 255, 255, 0.02);
 }
 
+
+.profile-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    overflow: hidden;
+}
+
+.profile-info span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 130px;
+    font-size: 0.95rem;
+}
+
+.logout-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.logout-btn:hover {
+    color: var(--f1-red);
+    background: rgba(225, 6, 0, 0.1);
+}
+
+/* Authentication Overlay Modal */
+.auth-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(15, 17, 21, 0.85);
+    backdrop-filter: blur(12px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.auth-panel {
+    width: 100%;
+    max-width: 400px;
+    padding: 35px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.auth-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.auth-logo {
+    font-size: 2.5rem;
+    margin-bottom: 15px;
+    filter: drop-shadow(0 0 10px rgba(225, 6, 0, 0.5));
+}
+
+.auth-header h2 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+.auth-header p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-icon {
+    position: absolute;
+    left: 14px;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.input-wrapper input {
+    width: 100%;
+    padding: 12px 12px 12px 42px;
+    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.95rem;
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+.input-wrapper input:focus {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--f1-red);
+    box-shadow: 0 0 10px rgba(225, 6, 0, 0.25);
+}
+
+.auth-btn {
+    background: var(--f1-red);
+    color: var(--text-primary);
+    border: none;
+    padding: 12px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(225, 6, 0, 0.3);
+}
+
+.auth-btn:hover {
+    background: var(--f1-red-hover);
+    box-shadow: 0 6px 20px rgba(225, 6, 0, 0.5);
+}
+
+.auth-switch {
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-top: 10px;
+}
+
+.auth-switch a {
+    color: var(--f1-red);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s ease;
+}
+
+.auth-switch a:hover {
+    color: #ff3c35;
+    text-decoration: underline;
+}
+
+.auth-error {
+    background: rgba(225, 6, 0, 0.15);
+    border: 1px solid rgba(225, 6, 0, 0.3);
+    color: #ff4a43;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+/* ── Collapsed sidebar overrides ───────────────────────── */
+
+/* Brand: icon stays, text+toggle push to right naturally */
+.sidebar.collapsed .brand {
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 30px;
+}
+
+/* New Chat button: icon only, centered */
+.sidebar.collapsed .new-chat-btn {
+    padding: 12px;
+    gap: 0;
+    justify-content: center;
+}
+
+/* Hide full chat list; show only a dots indicator */
+.sidebar.collapsed .chat-history-container {
+    overflow: hidden;
+}
+
+.sidebar.collapsed .chat-list-item {
+    padding: 10px;
+    justify-content: center;
+}
+
+/* Hide label text of each chat item, show only icon */
+.sidebar.collapsed .chat-list-item span {
+    width: 0;
+    overflow: hidden;
+    opacity: 0;
+    gap: 0;
+    transition: all 0.2s ease;
+}
+
+/* Always hide delete button when collapsed */
+.sidebar.collapsed .delete-chat-btn {
+    display: none;
+}
+
+/* Active item border still looks good */
+.sidebar.collapsed .chat-list-item.active {
+    border-left: 2px solid var(--f1-red);
+    padding-left: 8px;
+}
+
+/* User profile: stack avatar in centre, hide name & logout */
+.sidebar.collapsed .user-profile {
+    justify-content: center;
+    gap: 0;
+}
+
+.sidebar.collapsed .profile-info {
+    gap: 0;
+}
+
+.sidebar.collapsed .logout-btn {
+    visibility: hidden;
+    width: 0;
+    padding: 0;
+    overflow: hidden;
+}

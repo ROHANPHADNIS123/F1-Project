@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from fastf1 import plotting
 import logging
+import unicodedata
 import json
 import html
 
@@ -192,6 +193,45 @@ def find_grand_prix(query: str, year: int) -> str:
         pass
     return None
 
+def remove_diacritics(text: str) -> str:
+    if not text:
+        return ""
+    normalized = unicodedata.normalize('NFKD', text)
+    return "".join(c for c in normalized if not unicodedata.combining(c))
+
+def clean_history_for_llm(history: list) -> list:
+    if not history:
+        return []
+    cleaned = []
+    for msg in history:
+        content = msg['content']
+        # Replace telemetry containers
+        content = re.sub(
+            r'<div class="interactive-telemetry-plot".*?</div>',
+            '[Interactive Speed Telemetry Comparison Chart]',
+            content,
+            flags=re.IGNORECASE | re.DOTALL
+        )
+        # Replace track map containers
+        content = re.sub(
+            r'<div class="interactive-track-map".*?</div>',
+            '[Interactive Track Map Layout]',
+            content,
+            flags=re.IGNORECASE | re.DOTALL
+        )
+        # Replace any other SVG blocks
+        content = re.sub(
+            r'<svg.*?</svg>',
+            '[SVG Chart]',
+            content,
+            flags=re.IGNORECASE | re.DOTALL
+        )
+        cleaned.append({
+            "role": msg["role"],
+            "content": content
+        })
+    return cleaned
+
 def extract_drivers(text: str, session) -> list:
     try:
         available_drivers = session.results[['Abbreviation', 'FirstName', 'LastName', 'FullName']]
@@ -200,26 +240,27 @@ def extract_drivers(text: str, session) -> list:
         
     matched_drivers = []
     
+    # Strip diacritics from query text
+    text_clean = remove_diacritics(text).lower()
     # Preprocess text to clean "max" terms that refer to "maximum"
-    text_lower = text.lower()
-    text_lower = re.sub(
+    text_clean = re.sub(
         r'\bmax\.?\s+(speed|rpm|g|g-force|velocity|acceleration|power|temp|temperature|capacity|downforce|grip|limit|braking|brake|straight|straights|torque|gear|revs|rev)\b',
         r'maximum \1',
-        text_lower
+        text_clean
     )
     
     for _, row in available_drivers.iterrows():
-        abbrev = str(row['Abbreviation']).lower() if not pd.isna(row['Abbreviation']) else ""
-        firstname = str(row['FirstName']).lower() if not pd.isna(row['FirstName']) else ""
-        lastname = str(row['LastName']).lower() if not pd.isna(row['LastName']) else ""
-        fullname = str(row['FullName']).lower() if not pd.isna(row['FullName']) else ""
+        abbrev = remove_diacritics(str(row['Abbreviation'])).lower() if not pd.isna(row['Abbreviation']) else ""
+        firstname = remove_diacritics(str(row['FirstName'])).lower() if not pd.isna(row['FirstName']) else ""
+        lastname = remove_diacritics(str(row['LastName'])).lower() if not pd.isna(row['LastName']) else ""
+        fullname = remove_diacritics(str(row['FullName'])).lower() if not pd.isna(row['FullName']) else ""
         
         # Word boundary pattern matching for name/abbrev with optional possessive 's or s
         def is_match(name):
             if not name or len(name) < 2:  # avoid empty or extremely short names matching
                 return False
             pattern = r'\b' + re.escape(name) + r"(?:'s|s)?\b"
-            return bool(re.search(pattern, text_lower))
+            return bool(re.search(pattern, text_clean))
             
         if is_match(abbrev) or is_match(firstname) or is_match(lastname) or is_match(fullname):
             matched_drivers.append(str(row['Abbreviation']))
@@ -986,8 +1027,9 @@ def ask_f1_agent(query: str, history: list = None) -> str:
                 }
             ]
             
-            if history:
-                for h in history:
+            cleaned_history = clean_history_for_llm(history) if history else []
+            if cleaned_history:
+                for h in cleaned_history:
                     messages.append({"role": h["role"], "content": h["content"]})
                     
             messages.append({"role": "user", "content": query})
@@ -1098,7 +1140,7 @@ def ask_f1_agent(query: str, history: list = None) -> str:
     if matched_driver is not None:
         pos = int(matched_driver['Position']) if not pd.isna(matched_driver['Position']) else "N/A"
         team = matched_driver['TeamName']
-        status = matched_driver['Status']
+        status = str(matched_driver['Status']) if not pd.isna(matched_driver['Status']) and str(matched_driver['Status']).strip() else "Finished"
         
         suffix = "th"
         if isinstance(pos, int):

@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F1 AI — Admin Panel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --f1-red: #e10600;
+            --f1-red-dark: #b00500;
+            --bg: #0d0d0f;
+            --surface: rgba(255,255,255,0.04);
+            --border: rgba(255,255,255,0.08);
+            --text: #f0f0f0;
+            --muted: #888;
+            --green: #22c55e;
+            --yellow: #f59e0b;
+            --blue: #3b82f6;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* ── Login Screen ── */
+        #login-screen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: radial-gradient(ellipse at 50% 0%, rgba(225,6,0,0.15) 0%, transparent 60%);
+        }
+
+        .login-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 48px 40px;
+            width: 380px;
+            backdrop-filter: blur(20px);
+        }
+
+        .login-card .brand {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .login-card .brand i { font-size: 2.5rem; color: var(--f1-red); }
+        .login-card .brand h1 { font-size: 1.6rem; font-weight: 700; margin-top: 12px; }
+        .login-card .brand p { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
+
+        .form-field { margin-bottom: 18px; }
+        .form-field label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+
+        .input-wrap { position: relative; }
+        .input-wrap i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.9rem; }
+        .input-wrap input {
+            width: 100%;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px 12px 40px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .input-wrap input:focus { border-color: var(--f1-red); }
+
+        .btn-primary {
+            width: 100%;
+            background: var(--f1-red);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 13px;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+        .btn-primary:hover { background: var(--f1-red-dark); box-shadow: 0 0 20px rgba(225,6,0,0.4); }
+
+        #login-error {
+            background: rgba(225,6,0,0.15);
+            border: 1px solid rgba(225,6,0,0.3);
+            color: #ff6b6b;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 0.88rem;
+            margin-bottom: 14px;
+            display: none;
+        }
+
+        /* ── Admin Panel Layout ── */
+        #admin-panel { display: none; }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 32px;
+            background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            backdrop-filter: blur(16px);
+        }
+
+        .topbar-brand { display: flex; align-items: center; gap: 12px; }
+        .topbar-brand i { color: var(--f1-red); font-size: 1.4rem; }
+        .topbar-brand h1 { font-size: 1.2rem; font-weight: 700; }
+        .topbar-brand span { color: var(--muted); font-size: 0.85rem; margin-left: 4px; }
+
+        .topbar-right { display: flex; align-items: center; gap: 16px; }
+        .admin-badge { background: rgba(225,6,0,0.15); border: 1px solid rgba(225,6,0,0.3); color: var(--f1-red); border-radius: 20px; padding: 4px 12px; font-size: 0.8rem; font-weight: 600; }
+
+        .logout-link {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            border-radius: 8px;
+            padding: 7px 14px;
+            font-family: inherit;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .logout-link:hover { border-color: var(--f1-red); color: var(--f1-red); }
+
+        /* ── Content ── */
+        .content { padding: 32px; max-width: 1100px; margin: 0 auto; }
+
+        /* Stats Row */
+        .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px 24px;
+            display: flex; align-items: center; gap: 16px;
+        }
+        .stat-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
+        .stat-icon.red { background: rgba(225,6,0,0.15); color: var(--f1-red); }
+        .stat-icon.green { background: rgba(34,197,94,0.12); color: var(--green); }
+        .stat-icon.blue { background: rgba(59,130,246,0.12); color: var(--blue); }
+        .stat-val { font-size: 1.8rem; font-weight: 700; line-height: 1; }
+        .stat-label { color: var(--muted); font-size: 0.82rem; margin-top: 4px; }
+
+        /* Section header */
+        .section-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .section-header h2 { font-size: 1.1rem; font-weight: 600; }
+
+        /* Search bar */
+        .search-wrap { position: relative; }
+        .search-wrap i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.85rem; }
+        .search-wrap input {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 9px 14px 9px 34px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.9rem;
+            outline: none;
+            width: 220px;
+            transition: border-color 0.2s;
+        }
+        .search-wrap input:focus { border-color: var(--f1-red); }
+
+        /* Table */
+        .table-wrap {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+        thead tr { background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border); }
+        th { padding: 14px 20px; text-align: left; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); font-weight: 600; }
+        td { padding: 14px 20px; font-size: 0.93rem; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover td { background: rgba(255,255,255,0.02); }
+
+        .badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            border-radius: 20px; padding: 3px 10px; font-size: 0.78rem; font-weight: 600;
+        }
+        .badge.admin { background: rgba(225,6,0,0.15); color: var(--f1-red); border: 1px solid rgba(225,6,0,0.3); }
+        .badge.user  { background: rgba(255,255,255,0.06); color: var(--muted); border: 1px solid var(--border); }
+
+        .actions { display: flex; gap: 6px; }
+        .icon-btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            color: var(--muted);
+            border-radius: 7px;
+            width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.82rem;
+        }
+        .icon-btn:hover { border-color: var(--f1-red); color: var(--f1-red); background: rgba(225,6,0,0.1); }
+        .icon-btn.danger:hover { border-color: #ef4444; color: #ef4444; background: rgba(239,68,68,0.1); }
+        .icon-btn.success:hover { border-color: var(--green); color: var(--green); background: rgba(34,197,94,0.1); }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(6px);
+            display: none; align-items: center; justify-content: center;
+            z-index: 100;
+        }
+        .modal-overlay.open { display: flex; }
+
+        .modal-box {
+            background: #161618;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            width: 400px;
+            max-width: 90vw;
+        }
+        .modal-box h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 6px; }
+        .modal-box p { color: var(--muted); font-size: 0.88rem; margin-bottom: 22px; }
+
+        .modal-field { margin-bottom: 16px; }
+        .modal-field label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; }
+        .modal-field input {
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            padding: 10px 14px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .modal-field input:focus { border-color: var(--f1-red); }
+
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
+        .btn-cancel {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            border-radius: 8px;
+            padding: 9px 18px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-cancel:hover { border-color: var(--text); color: var(--text); }
+        .btn-save {
+            background: var(--f1-red);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 9px 20px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-save:hover { background: var(--f1-red-dark); }
+
+        .modal-error {
+            background: rgba(225,6,0,0.12);
+            border: 1px solid rgba(225,6,0,0.3);
+            color: #ff6b6b;
+            border-radius: 8px;
+            padding: 9px 12px;
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+            display: none;
+        }
+
+        /* Toast */
+        #toast {
+            position: fixed; bottom: 28px; right: 28px;
+            background: #1e1e20;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 20px;
+            font-size: 0.9rem;
+            display: flex; align-items: center; gap: 10px;
+            transform: translateY(80px); opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 200;
+        }
+        #toast.show { transform: translateY(0); opacity: 1; }
+        #toast.success { border-color: var(--green); }
+        #toast.error   { border-color: #ef4444; }
+        #toast i.success { color: var(--green); }
+        #toast i.error   { color: #ef4444; }
+
+        /* Empty state */
+        .empty-state { text-align: center; padding: 48px; color: var(--muted); }
+        .empty-state i { font-size: 2.5rem; opacity: 0.3; display: block; margin-bottom: 12px; }
+
+        /* Confirm modal */
+        .confirm-text { color: var(--text); font-size: 0.93rem; }
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 9px 20px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-danger:hover { background: #dc2626; }
+    </style>
+</head>
+<body>
+
+<!-- ── Login Screen ── -->
+<div id="login-screen">
+    <div class="login-card">
+        <div class="brand">
+            <i class="fa-solid fa-flag-checkered"></i>
+            <h1>Admin Panel</h1>
+            <p>F1 AI Dashboard — Admin Access</p>
+        </div>
+        <div id="login-error"></div>
+        <form id="login-form">
+            <div class="form-field">
+                <label>Username</label>
+                <div class="input-wrap">
+                    <i class="fa-regular fa-user"></i>
+                    <input type="text" id="admin-username" placeholder="Admin username" required autocomplete="username">
+                </div>
+            </div>
+            <div class="form-field">
+                <label>Password</label>
+                <div class="input-wrap">
+                    <i class="fa-solid fa-lock"></i>
+                    <input type="password" id="admin-password" placeholder="Admin password" required autocomplete="current-password">
+                </div>
+            </div>
+            <button type="submit" class="btn-primary"><i class="fa-solid fa-shield-halved"></i> &nbsp;Sign In as Admin</button>
+        </form>
+    </div>
+</div>
+
+<!-- ── Admin Panel ── -->
+<div id="admin-panel">
+    <div class="topbar">
+        <div class="topbar-brand">
+            <i class="fa-solid fa-flag-checkered"></i>
+            <h1>F1 AI <span>/ Admin</span></h1>
+        </div>
+        <div class="topbar-right">
+            <span class="admin-badge"><i class="fa-solid fa-shield-halved"></i> &nbsp;<span id="admin-name">Admin</span></span>
+            <button class="logout-link" onclick="doLogout()"><i class="fa-solid fa-right-from-bracket"></i> Log Out</button>
+        </div>
+    </div>
+
+    <div class="content">
+        <!-- Stats -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <div class="stat-icon red"><i class="fa-solid fa-users"></i></div>
+                <div>
+                    <div class="stat-val" id="stat-total">—</div>
+                    <div class="stat-label">Total Users</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon green"><i class="fa-solid fa-comments"></i></div>
+                <div>
+                    <div class="stat-val" id="stat-chats">—</div>
+                    <div class="stat-label">Total Chats</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon blue"><i class="fa-solid fa-message"></i></div>
+                <div>
+                    <div class="stat-val" id="stat-msgs">—</div>
+                    <div class="stat-label">Total Messages</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Table -->
+        <div class="section-header">
+            <h2><i class="fa-solid fa-users" style="color:var(--f1-red);margin-right:8px;"></i> Registered Users</h2>
+            <div class="search-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="search-input" placeholder="Search users…" oninput="filterUsers()">
+            </div>
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Chats</th>
+                        <th>Messages</th>
+                        <th>Joined</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="users-tbody">
+                    <tr><td colspan="7" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ── Edit Username Modal ── -->
+<div class="modal-overlay" id="modal-username">
+    <div class="modal-box">
+        <h3><i class="fa-solid fa-pen-to-square" style="color:var(--f1-red);margin-right:8px;"></i>Edit Username</h3>
+        <p id="modal-username-sub">Change the username for this account.</p>
+        <div class="modal-error" id="modal-username-error"></div>
+        <div class="modal-field">
+            <label>New Username</label>
+            <input type="text" id="new-username-input" placeholder="Enter new username">
+        </div>
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeModal('modal-username')">Cancel</button>
+            <button class="btn-save" onclick="saveUsername()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Change Password Modal ── -->
+<div class="modal-overlay" id="modal-password">
+    <div class="modal-box">
+        <h3><i class="fa-solid fa-key" style="color:var(--f1-red);margin-right:8px;"></i>Change Password</h3>
+        <p id="modal-password-sub">Set a new password for this account.</p>
+        <div class="modal-error" id="modal-password-error"></div>
+        <div class="modal-field">
+            <label>New Password (min 6 chars)</label>
+            <input type="password" id="new-password-input" placeholder="Enter new password">
+        </div>
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeModal('modal-password')">Cancel</button>
+            <button class="btn-save" onclick="savePassword()">Update</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Confirm Delete Modal ── -->
+<div class="modal-overlay" id="modal-delete">
+    <div class="modal-box">
+        <h3><i class="fa-solid fa-triangle-exclamation" style="color:#ef4444;margin-right:8px;"></i>Delete User</h3>
+        <p class="confirm-text" id="modal-delete-sub">This will permanently delete the user and all their chat history. This action cannot be undone.</p>
+        <div class="modal-actions" style="margin-top:24px;">
+            <button class="btn-cancel" onclick="closeModal('modal-delete')">Cancel</button>
+            <button class="btn-danger" onclick="confirmDelete()"><i class="fa-solid fa-trash-can"></i> Delete</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Toast ── -->
+<div id="toast"><i id="toast-icon"></i><span id="toast-msg"></span></div>
+
+<script>
+    let TOKEN = localStorage.getItem('f1_admin_token');
+    let ADMIN_USERNAME_STORED = localStorage.getItem('f1_admin_username');
+    let allUsers = [];
+    let activeUserId = null;
+
+    function getHeaders() {
+        return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN };
+    }
+
+    // ── Toast ──────────────────────────────────────────────────────────────────
+    function showToast(msg, type = 'success') {
+        const toast = document.getElementById('toast');
+        const icon  = document.getElementById('toast-icon');
+        const text  = document.getElementById('toast-msg');
+        toast.className = 'show ' + type;
+        icon.className  = (type === 'success' ? 'fa-solid fa-circle-check success' : 'fa-solid fa-circle-xmark error');
+        text.textContent = msg;
+        clearTimeout(toast._t);
+        toast._t = setTimeout(() => toast.className = '', 3000);
+    }
+
+    // ── Auth ───────────────────────────────────────────────────────────────────
+    document.getElementById('login-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('admin-username').value.trim();
+        const password = document.getElementById('admin-password').value;
+        const errEl = document.getElementById('login-error');
+        errEl.style.display = 'none';
+
+        try {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+            if (!res.ok) { errEl.textContent = data.detail || 'Login failed'; errEl.style.display = 'block'; return; }
+            if (!data.is_admin) { errEl.textContent = 'This account does not have admin privileges.'; errEl.style.display = 'block'; return; }
+            TOKEN = data.token;
+            ADMIN_USERNAME_STORED = data.username;
+            localStorage.setItem('f1_admin_token', TOKEN);
+            localStorage.setItem('f1_admin_username', ADMIN_USERNAME_STORED);
+            showAdminPanel();
+        } catch(err) {
+            errEl.textContent = 'Cannot connect to server.'; errEl.style.display = 'block';
+        }
+    };
+
+    async function doLogout() {
+        try { await fetch('/api/auth/logout', { method: 'POST', headers: getHeaders() }); } catch(e) {}
+        localStorage.removeItem('f1_admin_token');
+        localStorage.removeItem('f1_admin_username');
+        document.getElementById('admin-panel').style.display = 'none';
+        document.getElementById('login-screen').style.display = 'flex';
+    }
+
+    function showAdminPanel() {
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('admin-panel').style.display = 'block';
+        document.getElementById('admin-name').textContent = ADMIN_USERNAME_STORED || 'Admin';
+        loadUsers();
+    }
+
+    // ── Load Users ─────────────────────────────────────────────────────────────
+    async function loadUsers() {
+        try {
+            const res = await fetch('/api/admin/users', { headers: getHeaders() });
+            if (res.status === 401 || res.status === 403) { doLogout(); return; }
+            allUsers = await res.json();
+            updateStats();
+            renderTable(allUsers);
+        } catch(err) {
+            showToast('Failed to load users', 'error');
+        }
+    }
+
+    function updateStats() {
+        document.getElementById('stat-total').textContent = allUsers.length;
+        document.getElementById('stat-chats').textContent = allUsers.reduce((s, u) => s + (u.chat_count || 0), 0);
+        document.getElementById('stat-msgs').textContent  = allUsers.reduce((s, u) => s + (u.message_count || 0), 0);
+    }
+
+    function renderTable(users) {
+        const tbody = document.getElementById('users-tbody');
+        if (users.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><i class="fa-solid fa-users-slash"></i>No users found</div></td></tr>';
+            return;
+        }
+        tbody.innerHTML = users.map(u => `
+            <tr id="row-${u.id}">
+                <td style="color:var(--muted);font-size:0.82rem;">#${u.id}</td>
+                <td><strong>${escHtml(u.username)}</strong></td>
+                <td>
+                    <span class="badge ${u.is_admin ? 'admin' : 'user'}">
+                        <i class="fa-solid ${u.is_admin ? 'fa-shield-halved' : 'fa-user'}"></i>
+                        ${u.is_admin ? 'Admin' : 'User'}
+                    </span>
+                </td>
+                <td>${u.chat_count || 0}</td>
+                <td>${u.message_count || 0}</td>
+                <td style="color:var(--muted);font-size:0.85rem;">${formatDate(u.created_at)}</td>
+                <td>
+                    <div class="actions">
+                        <button class="icon-btn" title="Edit Username" onclick="openUsernameModal(${u.id}, '${escHtml(u.username)}')">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button class="icon-btn" title="Change Password" onclick="openPasswordModal(${u.id}, '${escHtml(u.username)}')">
+                            <i class="fa-solid fa-key"></i>
+                        </button>
+                        <button class="icon-btn success" title="${u.is_admin ? 'Revoke Admin' : 'Make Admin'}" onclick="toggleRole(${u.id}, ${u.is_admin ? 'false' : 'true'})">
+                            <i class="fa-solid ${u.is_admin ? 'fa-user-minus' : 'fa-user-shield'}"></i>
+                        </button>
+                        <button class="icon-btn danger" title="Delete User" onclick="openDeleteModal(${u.id}, '${escHtml(u.username)}')">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function filterUsers() {
+        const q = document.getElementById('search-input').value.toLowerCase();
+        renderTable(allUsers.filter(u => u.username.toLowerCase().includes(q)));
+    }
+
+    // ── Modals ─────────────────────────────────────────────────────────────────
+    function openModal(id) { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    function openUsernameModal(userId, current) {
+        activeUserId = userId;
+        document.getElementById('modal-username-sub').textContent = 'Editing username for: ' + current;
+        document.getElementById('new-username-input').value = current;
+        document.getElementById('modal-username-error').style.display = 'none';
+        openModal('modal-username');
+    }
+
+    function openPasswordModal(userId, username) {
+        activeUserId = userId;
+        document.getElementById('modal-password-sub').textContent = 'Reset password for: ' + username;
+        document.getElementById('new-password-input').value = '';
+        document.getElementById('modal-password-error').style.display = 'none';
+        openModal('modal-password');
+    }
+
+    function openDeleteModal(userId, username) {
+        activeUserId = userId;
+        document.getElementById('modal-delete-sub').textContent =
+            'Are you sure you want to permanently delete "' + username + '" and all their data?';
+        openModal('modal-delete');
+    }
+
+    // ── Actions ────────────────────────────────────────────────────────────────
+    async function saveUsername() {
+        const val = document.getElementById('new-username-input').value.trim();
+        const errEl = document.getElementById('modal-username-error');
+        errEl.style.display = 'none';
+        if (val.length < 3) { errEl.textContent = 'Username must be at least 3 characters'; errEl.style.display = 'block'; return; }
+
+        const res = await fetch('/api/admin/users/' + activeUserId + '/username', {
+            method: 'PATCH', headers: getHeaders(),
+            body: JSON.stringify({ new_username: val })
+        });
+        const data = await res.json();
+        if (!res.ok) { errEl.textContent = data.detail || 'Update failed'; errEl.style.display = 'block'; return; }
+        closeModal('modal-username');
+        showToast('Username updated successfully');
+        loadUsers();
+    }
+
+    async function savePassword() {
+        const val = document.getElementById('new-password-input').value;
+        const errEl = document.getElementById('modal-password-error');
+        errEl.style.display = 'none';
+        if (val.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; errEl.style.display = 'block'; return; }
+
+        const res = await fetch('/api/admin/users/' + activeUserId + '/password', {
+            method: 'PATCH', headers: getHeaders(),
+            body: JSON.stringify({ new_password: val })
+        });
+        const data = await res.json();
+        if (!res.ok) { errEl.textContent = data.detail || 'Update failed'; errEl.style.display = 'block'; return; }
+        closeModal('modal-password');
+        showToast('Password updated successfully');
+    }
+
+    async function toggleRole(userId, makeAdmin) {
+        const res = await fetch('/api/admin/users/' + userId + '/role', {
+            method: 'PATCH', headers: getHeaders(),
+            body: JSON.stringify({ is_admin: makeAdmin === 'true' || makeAdmin === true })
+        });
+        const data = await res.json();
+        if (!res.ok) { showToast(data.detail || 'Update failed', 'error'); return; }
+        showToast('Role updated successfully');
+        loadUsers();
+    }
+
+    async function confirmDelete() {
+        const res = await fetch('/api/admin/users/' + activeUserId, {
+            method: 'DELETE', headers: getHeaders()
+        });
+        const data = await res.json();
+        if (!res.ok) { showToast(data.detail || 'Delete failed', 'error'); closeModal('modal-delete'); return; }
+        closeModal('modal-delete');
+        showToast('User deleted successfully');
+        loadUsers();
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+    function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function formatDate(iso) {
+        if (!iso) return '—';
+        const d = new Date(iso.replace(' ', 'T') + 'Z');
+        return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+    }
+
+    // Close modals on backdrop click
+    document.querySelectorAll('.modal-overlay').forEach(el => {
+        el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+    });
+
+    // ── Init ───────────────────────────────────────────────────────────────────
+    if (TOKEN && ADMIN_USERNAME_STORED) {
+        showAdminPanel();
+    }
+</script>
+</body>
+</html>
