@@ -43,8 +43,12 @@ function formatContent(content) {
                 processedHtml.push(tableHtml);
             }
             if (line !== '') {
-                if (line.startsWith('###')) {
-                    processedHtml.push(`<h3>${line.replace('###', '').trim()}</h3>`);
+                if (line.startsWith('####')) {
+                    processedHtml.push(`<h4>${line.replace(/^####\s*/, '').trim()}</h4>`);
+                } else if (line.startsWith('###')) {
+                    processedHtml.push(`<h3>${line.replace(/^###\s*/, '').trim()}</h3>`);
+                } else if (line.startsWith('<')) {
+                    processedHtml.push(line);
                 } else {
                     processedHtml.push(`<p>${line}</p>`);
                 }
@@ -66,14 +70,9 @@ function addMessage(content, isUser = false) {
     const msgDiv = document.createElement('div');
     msgDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
     
-    let avatarHtml = isUser 
-        ? `<div class="avatar"><i class="fa-solid fa-user"></i></div>` 
-        : `<div class="avatar ai-avatar"><i class="fa-solid fa-robot"></i></div>`;
-        
     const formattedContent = formatContent(content);
 
     msgDiv.innerHTML = `
-        ${avatarHtml}
         <div class="message-content glass-panel">
             ${formattedContent}
         </div>
@@ -87,7 +86,6 @@ function addTypingIndicator() {
     const msgDiv = document.createElement('div');
     msgDiv.className = 'message ai-message typing-msg';
     msgDiv.innerHTML = `
-        <div class="avatar ai-avatar"><i class="fa-solid fa-robot"></i></div>
         <div class="message-content glass-panel typing-indicator">
             <span></span><span></span><span></span>
         </div>
@@ -298,3 +296,210 @@ function init() {
 }
 
 init();
+
+// Interactive Track Map Snapping Tooltips
+window.handleTrackHover = function(evt, svgElem) {
+    const rect = svgElem.getBoundingClientRect();
+    const mouseX = evt.clientX - rect.left;
+    const mouseY = evt.clientY - rect.top;
+    
+    const viewBox = svgElem.viewBox.baseVal;
+    const svgX = (mouseX / rect.width) * viewBox.width;
+    const svgY = (mouseY / rect.height) * viewBox.height;
+    
+    // Parse track telemetry data
+    let points;
+    try {
+        points = JSON.parse(svgElem.getAttribute("data-telemetry-points"));
+    } catch(e) {
+        return;
+    }
+    
+    if (!points || points.length === 0) return;
+    
+    // Find closest point by 2D distance
+    let closestPoint = points[0];
+    let minDistance = Math.pow(points[0].x - svgX, 2) + Math.pow(points[0].y - svgY, 2);
+    
+    for (let i = 1; i < points.length; i++) {
+        const dist = Math.pow(points[i].x - svgX, 2) + Math.pow(points[i].y - svgY, 2);
+        if (dist < minDistance) {
+            minDistance = dist;
+            closestPoint = points[i];
+        }
+    }
+    
+    // If the mouse is too far from the track (e.g. > 150px in SVG space), hide it
+    if (minDistance > 22500) { // 150^2 = 22500
+        window.handleTrackLeave(evt, svgElem);
+        return;
+    }
+    
+    // Position guide marker circle
+    const marker = svgElem.querySelector("#track-guide-marker");
+    if (marker) {
+        marker.setAttribute("cx", closestPoint.x);
+        marker.setAttribute("cy", closestPoint.y);
+        marker.style.display = "block";
+    }
+    
+    // Update tooltip
+    const container = svgElem.closest(".interactive-track-map");
+    const tooltip = container.querySelector(".track-tooltip");
+    if (tooltip) {
+        tooltip.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 6px; color: #ff1801; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; font-size: 13px;">Telemetry Point</div>
+            <div style="margin: 3px 0;">Speed: <strong style="color: #ffffff; font-size: 13px;">${closestPoint.s} km/h</strong></div>
+            <div style="margin: 3px 0;">Distance: <strong style="color: #ffffff;">${closestPoint.d} m</strong></div>
+            <div style="margin: 3px 0;">Gear: <strong style="color: #ffffff;">${closestPoint.g}</strong></div>
+            <div style="margin: 3px 0;">Lap Time: <strong style="color: #ffffff;">${closestPoint.t}</strong></div>
+        `;
+        tooltip.style.display = "block";
+        
+        const containerRect = container.getBoundingClientRect();
+        const x = evt.clientX - containerRect.left + 15;
+        const y = evt.clientY - containerRect.top + 15;
+        tooltip.style.left = x + "px";
+        tooltip.style.top = y + "px";
+    }
+};
+
+window.handleTrackLeave = function(evt, svgElem) {
+    const marker = svgElem.querySelector("#track-guide-marker");
+    if (marker) marker.style.display = "none";
+    
+    const container = svgElem.closest(".interactive-track-map");
+    const tooltip = container.querySelector(".track-tooltip");
+    if (tooltip) tooltip.style.display = "none";
+};
+
+// Interactive Telemetry Plot Snapping Tooltips
+window.handleTelemetryHover = function(evt, svgElem) {
+    const rect = svgElem.getBoundingClientRect();
+    const mouseX = evt.clientX - rect.left;
+    const mouseY = evt.clientY - rect.top;
+    
+    // Convert mouseX to SVG user space coordinate
+    const viewBox = svgElem.viewBox.baseVal;
+    const svgX = (mouseX / rect.width) * viewBox.width;
+    
+    // Retrieve margins and ranges
+    const marginL = parseFloat(svgElem.getAttribute("data-margin-l"));
+    const marginR = parseFloat(svgElem.getAttribute("data-margin-r"));
+    const marginT = parseFloat(svgElem.getAttribute("data-margin-t"));
+    const marginB = parseFloat(svgElem.getAttribute("data-margin-b"));
+    const xMin = parseFloat(svgElem.getAttribute("data-x-min"));
+    const xMax = parseFloat(svgElem.getAttribute("data-x-max"));
+    const yMin = parseFloat(svgElem.getAttribute("data-y-min"));
+    const yMax = parseFloat(svgElem.getAttribute("data-y-max"));
+    
+    const plotW = viewBox.width - marginL - marginR;
+    const plotH = viewBox.height - marginT - marginB;
+    
+    // Check if mouse is within the plot area horizontally
+    if (svgX < marginL || svgX > viewBox.width - marginR) {
+        window.handleTelemetryLeave(evt, svgElem);
+        return;
+    }
+    
+    // Calculate the distance value corresponding to svgX
+    const pctX = (svgX - marginL) / plotW;
+    const targetDist = xMin + pctX * (xMax - xMin);
+    
+    // Parse telemetry data
+    let telemetryData;
+    try {
+        telemetryData = JSON.parse(svgElem.getAttribute("data-telemetry"));
+    } catch(e) {
+        return;
+    }
+    
+    if (!telemetryData || telemetryData.length === 0) return;
+    
+    // Find the closest point for each driver
+    const activePoints = [];
+    telemetryData.forEach((driverData, idx) => {
+        const points = driverData.points;
+        let closest = points[0];
+        let minDist = Math.abs(points[0].d - targetDist);
+        
+        for (let i = 1; i < points.length; i++) {
+            const diff = Math.abs(points[i].d - targetDist);
+            if (diff < minDist) {
+                minDist = diff;
+                closest = points[i];
+            }
+        }
+        activePoints.push({
+            driver: driverData.name,
+            color: driverData.color,
+            point: closest
+        });
+    });
+    
+    if (activePoints.length === 0) return;
+    
+    // Update guide line position
+    const guide = svgElem.querySelector("#telemetry-guide");
+    if (guide) {
+        guide.setAttribute("x1", svgX);
+        guide.setAttribute("x2", svgX);
+        guide.style.display = "block";
+    }
+    
+    // Update driver circle markers
+    activePoints.forEach((ap, idx) => {
+        const marker = svgElem.querySelector(`.telemetry-marker[data-driver-index="${idx}"]`);
+        if (marker) {
+            // Scale values to SVG coordinates
+            const cx = marginL + (ap.point.d - xMin) / (xMax - xMin) * plotW;
+            const cy = (viewBox.height - marginB) - (ap.point.s - yMin) / (yMax - yMin) * plotH;
+            marker.setAttribute("cx", cx.toFixed(1));
+            marker.setAttribute("cy", cy.toFixed(1));
+            marker.style.display = "block";
+        }
+    });
+    
+    // Update tooltip content
+    const container = svgElem.closest(".interactive-telemetry-plot");
+    const tooltip = container.querySelector(".telemetry-tooltip");
+    if (tooltip) {
+        let tooltipHtml = `
+            <div style="font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; font-size: 13px;">
+                Distance: ${Math.round(activePoints[0].point.d)} m
+            </div>
+        `;
+        
+        activePoints.forEach(ap => {
+            tooltipHtml += `
+                <div style="margin: 6px 0; display: flex; flex-direction: column;">
+                    <span style="color: ${ap.color}; font-weight: bold; font-size: 12px;">${ap.driver}</span>
+                    <span style="color: #ffffff; font-size: 12px; margin-top: 2px;">
+                        Speed: <strong style="font-size: 13px;">${Math.round(ap.point.s)} km/h</strong> | Gear: <strong>${ap.point.g}</strong>
+                    </span>
+                </div>
+            `;
+        });
+        
+        tooltip.innerHTML = tooltipHtml;
+        tooltip.style.display = "block";
+        
+        const containerRect = container.getBoundingClientRect();
+        const x = evt.clientX - containerRect.left + 15;
+        const y = evt.clientY - containerRect.top + 15;
+        tooltip.style.left = x + "px";
+        tooltip.style.top = y + "px";
+    }
+};
+
+window.handleTelemetryLeave = function(evt, svgElem) {
+    const guide = svgElem.querySelector("#telemetry-guide");
+    if (guide) guide.style.display = "none";
+    
+    const markers = svgElem.querySelectorAll(".telemetry-marker");
+    markers.forEach(m => m.style.display = "none");
+    
+    const container = svgElem.closest(".interactive-telemetry-plot");
+    const tooltip = container.querySelector(".telemetry-tooltip");
+    if (tooltip) tooltip.style.display = "none";
+};

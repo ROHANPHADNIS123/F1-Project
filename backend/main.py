@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -8,46 +8,12 @@ from dotenv import load_dotenv
 import os
 import subprocess
 import requests
+import base64
 
-# Load environment variables (like GEMINI_API_KEY) from .env file
+# Load environment variables (like GEMINI_API_KEY, GROQ_API_KEY) from .env file
 load_dotenv()
 
-def check_and_start_ollama():
-    ollama_url = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
-    try:
-        resp = requests.get(f"{ollama_url}/api/tags", timeout=1)
-        if resp.status_code == 200:
-            print("Ollama server is already running.")
-            return
-    except Exception:
-        pass
-        
-    # Ollama is not running. Let's see if we can start it.
-    ollama_exe = "E:\\Ollama\\ollama.exe"
-    if os.path.exists(ollama_exe):
-        print(f"Ollama is not running. Attempting to start it from {ollama_exe}...")
-        env = os.environ.copy()
-        env["OLLAMA_MODELS"] = "E:\\Ollama\\models"
-        try:
-            # Start as a detached background process on Windows
-            subprocess.Popen(
-                [ollama_exe, "serve"],
-                env=env,
-                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            print("Ollama server start command issued.")
-        except Exception as e:
-            print(f"Failed to auto-start Ollama: {e}")
-    else:
-        print(f"Ollama executable not found at {ollama_exe}. Skip auto-start.")
-
 app = FastAPI(title="F1 AI Assistant API")
-
-@app.on_event("startup")
-async def startup_event():
-    check_and_start_ollama()
 
 # Allow CORS so our frontend can communicate with the FastAPI backend
 app.add_middleware(
@@ -81,6 +47,23 @@ async def health():
 frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
 if not os.path.exists(frontend_dir):
     os.makedirs(frontend_dir)
+
+# 1x1 transparent PNG bytes for placeholder response
+TRANSPARENT_PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=")
+
+@app.get("/static/graphs/{filename}")
+async def get_graph(filename: str):
+    """Route to serve graph files or a transparent placeholder if the file does not exist, preventing terminal 404 errors."""
+    filepath = os.path.join(frontend_dir, "graphs", filename)
+    if os.path.exists(filepath):
+        return FileResponse(filepath)
+    else:
+        if filename.endswith(".svg"):
+            empty_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"></svg>'
+            return Response(content=empty_svg, media_type="image/svg+xml")
+        else:
+            return Response(content=TRANSPARENT_PNG, media_type="image/png")
+
 app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
 
 @app.get("/")
