@@ -178,6 +178,13 @@ async def chat(req: ChatQueryRequest, current_user: dict = Depends(get_current_u
     history_list = get_chat_messages(req.chat_id)
     answer = ask_f1_agent(req.query, history_list)
     
+    # Detect Groq rate-limit / token exhaustion sentinel
+    if answer == "__GROQ_RATE_LIMIT__":
+        raise HTTPException(
+            status_code=429,
+            detail="groq_rate_limit"
+        )
+    
     add_message(req.chat_id, "user", req.query)
     add_message(req.chat_id, "assistant", answer)
     

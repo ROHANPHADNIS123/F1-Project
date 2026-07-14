@@ -1550,6 +1550,11 @@ def ask_f1_agent(query: str, history: list = None) -> str:
                 )
                 return completion.choices[0].message.content
             except Exception as e:
+                err_str = str(e).lower()
+                # Detect token/rate-limit exhaustion specifically
+                if any(k in err_str for k in ["rate_limit", "rate limit", "quota", "tokens exceeded",
+                                               "insufficient_quota", "too many requests", "429"]):
+                    return "__GROQ_RATE_LIMIT__"
                 print(f"Groq API error: {e}. Falling back to local parser.")
         except Exception as e:
             print(f"RAG reasoning query failed: {e}. Falling back to local parser.")

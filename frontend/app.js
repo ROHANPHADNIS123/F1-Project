@@ -312,6 +312,67 @@ function renderCurrentChat() {
     }
 }
 
+// ── Groq Rate-Limit Banner ────────────────────────────────────────────────────
+function showGroqRateLimitBanner() {
+    // Remove any existing banner
+    const existing = document.getElementById('groq-rate-banner');
+    if (existing) existing.remove();
+
+    const banner = document.createElement('div');
+    banner.id = 'groq-rate-banner';
+    banner.innerHTML = `
+        <div style="
+            position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+            background: linear-gradient(135deg, #1a0a00, #2d1200);
+            border: 1px solid #f59e0b;
+            border-radius: 12px;
+            padding: 14px 20px;
+            display: flex; align-items: center; gap: 14px;
+            box-shadow: 0 8px 32px rgba(245,158,11,0.25);
+            z-index: 9999;
+            max-width: 520px;
+            width: calc(100vw - 32px);
+            animation: slideDown 0.3s ease;
+        ">
+            <span style="font-size:1.5rem; flex-shrink:0;">⚠️</span>
+            <div style="flex:1;">
+                <div style="font-weight:700; color:#f59e0b; font-size:0.95rem; margin-bottom:3px;">
+                    Groq AI Token Limit Reached
+                </div>
+                <div style="color:#d4a55a; font-size:0.82rem; line-height:1.4;">
+                    You've run out of Groq API tokens for this period. 
+                    The assistant will continue using its built-in F1 database.
+                    <a href="https://console.groq.com" target="_blank"
+                       style="color:#f59e0b; text-decoration:underline; margin-left:4px;">
+                        Check your Groq usage →
+                    </a>
+                </div>
+            </div>
+            <button onclick="document.getElementById('groq-rate-banner').remove()" style="
+                background: rgba(245,158,11,0.15);
+                border: 1px solid rgba(245,158,11,0.4);
+                color: #f59e0b;
+                border-radius: 6px;
+                width: 28px; height: 28px;
+                cursor: pointer;
+                font-size: 1rem;
+                flex-shrink: 0;
+                display: flex; align-items: center; justify-content: center;
+            ">✕</button>
+        </div>
+        <style>
+            @keyframes slideDown {
+                from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+                to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+            }
+        </style>
+    `;
+    document.body.appendChild(banner);
+
+    // Auto-dismiss after 10 seconds
+    setTimeout(() => { if (banner.parentNode) banner.remove(); }, 10000);
+}
+
 async function handleSend() {
     const query = queryInput.value.trim();
     if (!query) return;
@@ -340,16 +401,30 @@ async function handleSend() {
     // Add typing indicator
     const typingIndicator = addTypingIndicator();
 
+    // 90-second timeout to survive Render free-tier cold starts
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000);
+
     try {
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: getHeaders(),
-            body: JSON.stringify({ chat_id: currentChatId, query: query })
+            body: JSON.stringify({ chat_id: currentChatId, query: query }),
+            signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
 
         if (response.status === 401) {
             typingIndicator.remove();
             checkAuth();
+            return;
+        }
+
+        // Groq token / rate-limit exhaustion
+        if (response.status === 429) {
+            typingIndicator.remove();
+            showGroqRateLimitBanner();
             return;
         }
 
@@ -382,8 +457,12 @@ async function handleSend() {
         }
 
     } catch (error) {
+        clearTimeout(timeoutId);
         typingIndicator.remove();
-        const errMsg = "Sorry, I encountered an error connecting to the F1 backend server.";
+        const isTimeout = error.name === 'AbortError';
+        const errMsg = isTimeout
+            ? "⏳ The server is waking up from sleep — please resend your message in a moment."
+            : "Sorry, I encountered an error connecting to the F1 backend server.";
         currentChat.messages.push({ role: 'assistant', content: errMsg });
         addMessage(errMsg, false);
         console.error(error);
