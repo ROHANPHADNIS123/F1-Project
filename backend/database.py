@@ -5,12 +5,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta
 
-# Check for Render environment DB path (SQLite)
-if os.environ.get("RENDER") == "true":
-    os.makedirs("/var/data", exist_ok=True)
-    DB_PATH = "/var/data/f1_dashboard.db"
-else:
-    DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "f1_dashboard.db")
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "f1_dashboard.db")
 
 # Try initializing Firebase Firestore
 USE_FIREBASE = False

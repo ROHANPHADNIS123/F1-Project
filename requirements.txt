@@ -9,4 +9,3 @@ requests
 python-dotenv
 groq
 firebase-admin
-
