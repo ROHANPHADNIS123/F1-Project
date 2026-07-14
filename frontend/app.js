@@ -7,7 +7,7 @@ function formatContent(content) {
     let inTable = false;
     let tableHtml = '';
     let processedHtml = [];
-    
+
     for (let i = 0; i < lines.length; i++) {
         let line = lines[i].trim();
         if (line.startsWith('|') && line.endsWith('|')) {
@@ -15,13 +15,13 @@ function formatContent(content) {
                 inTable = true;
                 tableHtml = '<div class="table-container"><table class="f1-table">';
             }
-            
+
             const cells = line.split('|').slice(1, -1).map(c => c.trim());
             const isSeparator = cells.every(c => c.match(/^:-*-?:*$/) || c.match(/^-+$/));
             if (isSeparator) {
                 continue;
             }
-            
+
             const isHeader = !tableHtml.includes('</thead>');
             if (isHeader) {
                 tableHtml += '<thead><tr>';
@@ -55,12 +55,12 @@ function formatContent(content) {
             }
         }
     }
-    
+
     if (inTable) {
         tableHtml += '</tbody></table></div>';
         processedHtml.push(tableHtml);
     }
-    
+
     let finalHtml = processedHtml.join('');
     finalHtml = finalHtml.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     return finalHtml;
@@ -69,7 +69,7 @@ function formatContent(content) {
 function addMessage(content, isUser = false, animate = false) {
     const msgDiv = document.createElement('div');
     msgDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
-    
+
     const formattedContent = formatContent(content);
 
     msgDiv.innerHTML = `
@@ -77,10 +77,10 @@ function addMessage(content, isUser = false, animate = false) {
             ${formattedContent}
         </div>
     `;
-    
+
     chatHistory.appendChild(msgDiv);
     chatHistory.scrollTop = chatHistory.scrollHeight;
-    
+
     if (animate && !isUser) {
         if (typeof typeHtmlEffect === 'function') {
             typeHtmlEffect(msgDiv.querySelector('.message-content'));
@@ -214,14 +214,14 @@ async function checkAuth() {
 async function selectChat(id) {
     currentChatId = id;
     renderChatList();
-    
+
     const currentChat = chats.find(c => c.id === currentChatId);
     // If the chat is a local temporary chat (not in DB), render it directly (it has empty messages)
     if (!currentChat || currentChat.isTemp) {
         renderCurrentChat();
         return;
     }
-    
+
     // Fetch historical messages from backend database
     try {
         const response = await fetch(`/api/chats/${id}/messages`, {
@@ -232,7 +232,7 @@ async function selectChat(id) {
             currentChat.messages = messages;
             renderCurrentChat();
         }
-    } catch(e) {
+    } catch (e) {
         console.error("Failed to load chat messages:", e);
     }
 }
@@ -248,11 +248,11 @@ async function deleteChat(id, event) {
                     method: 'DELETE',
                     headers: getHeaders()
                 });
-            } catch(e) {
+            } catch (e) {
                 console.error("Failed to delete chat:", e);
             }
         }
-        
+
         chats = chats.filter(c => c.id !== id);
         if (chats.length === 0) {
             const defaultChat = {
@@ -266,7 +266,7 @@ async function deleteChat(id, event) {
         } else if (currentChatId === id) {
             currentChatId = chats[0].id;
         }
-        
+
         renderChatList();
         renderCurrentChat();
     }
@@ -278,15 +278,15 @@ function renderChatList() {
         const item = document.createElement('div');
         item.className = `chat-list-item ${chat.id === currentChatId ? 'active' : ''}`;
         item.onclick = () => selectChat(chat.id);
-        
+
         const titleSpan = document.createElement('span');
         titleSpan.innerHTML = `<i class="fa-regular fa-message"></i> ${chat.label}`;
-        
+
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'delete-chat-btn';
         deleteBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
         deleteBtn.onclick = (e) => deleteChat(chat.id, e);
-        
+
         item.appendChild(titleSpan);
         item.appendChild(deleteBtn);
         chatList.appendChild(item);
@@ -296,17 +296,17 @@ function renderChatList() {
 function renderCurrentChat() {
     chatHistory.innerHTML = '';
     const currentChat = chats.find(c => c.id === currentChatId);
-    
+
     // Add welcome message if chat has no messages
     if (!currentChat || !currentChat.messages || currentChat.messages.length === 0) {
         addMessage('Welcome to the FastF1 AI Dashboard! 🏎️💨\n\nI can help you analyze race results, lap times, and telemetry. Try asking me something like: **"Who won the 2023 Bahrain Grand Prix?"** or **"What was the fastest lap in the 2023 Monaco race?"**', false);
         return;
     }
-    
+
     currentChat.messages.forEach(msg => {
         addMessage(msg.content, msg.role === 'user');
     });
-    
+
     if (typeof autoplayTrackMaps === 'function') {
         autoplayTrackMaps();
     }
@@ -322,47 +322,47 @@ async function handleSend() {
     // Local echo of user message
     if (!currentChat.messages) currentChat.messages = [];
     currentChat.messages.push({ role: 'user', content: query });
-    
+
     // Update local chat list label if it was a New Chat
     if (currentChat.label === 'New Chat') {
         currentChat.label = query.length > 22 ? query.substring(0, 20) + '...' : query;
         renderChatList();
     }
-    
+
     // Clear welcome message if this is the first message in the chat
     if (currentChat.messages.length === 1) {
         chatHistory.innerHTML = '';
     }
-    
+
     addMessage(query, true);
     queryInput.value = '';
-    
+
     // Add typing indicator
     const typingIndicator = addTypingIndicator();
-    
+
     try {
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify({ chat_id: currentChatId, query: query })
         });
-        
+
         if (response.status === 401) {
             typingIndicator.remove();
             checkAuth();
             return;
         }
-        
+
         const data = await response.json();
-        
+
         // Remove typing indicator
         typingIndicator.remove();
-        
+
         // Append assistant response
         currentChat.messages.push({ role: 'assistant', content: data.response });
-        
+
         const wasTemp = currentChat.isTemp;
-        
+
         // If this was a temporary chat, fetch list to update synced ID/label from DB
         if (wasTemp) {
             const chatsResponse = await fetch('/api/chats', {
@@ -380,7 +380,7 @@ async function handleSend() {
             renderChatList();
             addMessage(data.response, false, true);
         }
-        
+
     } catch (error) {
         typingIndicator.remove();
         const errMsg = "Sorry, I encountered an error connecting to the F1 backend server.";
@@ -398,7 +398,7 @@ queryInput.addEventListener('keypress', (e) => {
 newChatBtn.addEventListener('click', () => {
     const mostRecentChat = chats[0];
     const isMostRecentEmpty = mostRecentChat && (!mostRecentChat.messages || mostRecentChat.messages.length === 0);
-    
+
     if (isMostRecentEmpty) {
         selectChat(mostRecentChat.id);
     } else {
@@ -434,7 +434,7 @@ document.addEventListener('keydown', (e) => {
             closeGraphModal();
         }
     }
-    
+
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
         const authModal = document.getElementById('auth-modal');
         if (authModal && authModal.style.display !== 'none') {
@@ -463,17 +463,17 @@ showLoginBtn.onclick = (e) => {
 loginForm.onsubmit = async (e) => {
     e.preventDefault();
     loginError.style.display = 'none';
-    
+
     const username = loginUsernameInput.value.trim();
     const password = loginPasswordInput.value;
-    
+
     try {
         const response = await fetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
         });
-        
+
         const data = await response.json();
         if (response.ok) {
             localStorage.setItem('f1_token', data.token);
@@ -485,7 +485,7 @@ loginForm.onsubmit = async (e) => {
             loginError.innerText = data.detail || 'Login failed';
             loginError.style.display = 'block';
         }
-    } catch(err) {
+    } catch (err) {
         loginError.innerText = 'Unable to connect to the server';
         loginError.style.display = 'block';
     }
@@ -495,17 +495,17 @@ loginForm.onsubmit = async (e) => {
 registerForm.onsubmit = async (e) => {
     e.preventDefault();
     registerError.style.display = 'none';
-    
+
     const username = registerUsernameInput.value.trim();
     const password = registerPasswordInput.value;
-    
+
     try {
         const response = await fetch('/api/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
         });
-        
+
         const data = await response.json();
         if (response.ok) {
             registerUsernameInput.value = '';
@@ -518,7 +518,7 @@ registerForm.onsubmit = async (e) => {
             registerError.innerText = data.detail || 'Registration failed';
             registerError.style.display = 'block';
         }
-    } catch(err) {
+    } catch (err) {
         registerError.innerText = 'Unable to connect to the server';
         registerError.style.display = 'block';
     }
@@ -532,8 +532,8 @@ if (logoutBtn) {
                 method: 'POST',
                 headers: getHeaders()
             });
-        } catch(e) {}
-        
+        } catch (e) { }
+
         localStorage.removeItem('f1_token');
         localStorage.removeItem('f1_username');
         chats = [];
@@ -640,29 +640,29 @@ function init() {
 init();
 
 // Interactive Track Map Snapping Tooltips
-window.handleTrackHover = function(evt, svgElem) {
+window.handleTrackHover = function (evt, svgElem) {
     const rect = svgElem.getBoundingClientRect();
     const mouseX = evt.clientX - rect.left;
     const mouseY = evt.clientY - rect.top;
-    
+
     const viewBox = svgElem.viewBox.baseVal;
     const svgX = (mouseX / rect.width) * viewBox.width;
     const svgY = (mouseY / rect.height) * viewBox.height;
-    
+
     // Parse track telemetry data
     let points;
     try {
         points = JSON.parse(svgElem.getAttribute("data-telemetry-points"));
-    } catch(e) {
+    } catch (e) {
         return;
     }
-    
+
     if (!points || points.length === 0) return;
-    
+
     // Find closest point by 2D distance
     let closestPoint = points[0];
     let minDistance = Math.pow(points[0].x - svgX, 2) + Math.pow(points[0].y - svgY, 2);
-    
+
     for (let i = 1; i < points.length; i++) {
         const dist = Math.pow(points[i].x - svgX, 2) + Math.pow(points[i].y - svgY, 2);
         if (dist < minDistance) {
@@ -670,13 +670,13 @@ window.handleTrackHover = function(evt, svgElem) {
             closestPoint = points[i];
         }
     }
-    
+
     // If the mouse is too far from the track (e.g. > 150px in SVG space), hide it
     if (minDistance > 22500) { // 150^2 = 22500
         window.handleTrackLeave(evt, svgElem);
         return;
     }
-    
+
     // Position guide marker circle
     const marker = svgElem.querySelector("#track-guide-marker");
     if (marker) {
@@ -684,7 +684,7 @@ window.handleTrackHover = function(evt, svgElem) {
         marker.setAttribute("cy", closestPoint.y);
         marker.style.display = "block";
     }
-    
+
     // Update tooltip
     const container = svgElem.closest(".interactive-track-map");
     const tooltip = container.querySelector(".track-tooltip");
@@ -697,7 +697,7 @@ window.handleTrackHover = function(evt, svgElem) {
             <div style="margin: 3px 0;">Lap Time: <strong style="color: #ffffff;">${closestPoint.t}</strong></div>
         `;
         tooltip.style.display = "block";
-        
+
         const containerRect = container.getBoundingClientRect();
         const x = evt.clientX - containerRect.left + 15;
         const y = evt.clientY - containerRect.top + 15;
@@ -706,25 +706,25 @@ window.handleTrackHover = function(evt, svgElem) {
     }
 };
 
-window.handleTrackLeave = function(evt, svgElem) {
+window.handleTrackLeave = function (evt, svgElem) {
     const marker = svgElem.querySelector("#track-guide-marker");
     if (marker) marker.style.display = "none";
-    
+
     const container = svgElem.closest(".interactive-track-map");
     const tooltip = container.querySelector(".track-tooltip");
     if (tooltip) tooltip.style.display = "none";
 };
 
 // Interactive Telemetry Plot Snapping Tooltips
-window.handleTelemetryHover = function(evt, svgElem) {
+window.handleTelemetryHover = function (evt, svgElem) {
     const rect = svgElem.getBoundingClientRect();
     const mouseX = evt.clientX - rect.left;
     const mouseY = evt.clientY - rect.top;
-    
+
     // Convert mouseX to SVG user space coordinate
     const viewBox = svgElem.viewBox.baseVal;
     const svgX = (mouseX / rect.width) * viewBox.width;
-    
+
     // Retrieve margins and ranges
     const marginL = parseFloat(svgElem.getAttribute("data-margin-l"));
     const marginR = parseFloat(svgElem.getAttribute("data-margin-r"));
@@ -734,37 +734,37 @@ window.handleTelemetryHover = function(evt, svgElem) {
     const xMax = parseFloat(svgElem.getAttribute("data-x-max"));
     const yMin = parseFloat(svgElem.getAttribute("data-y-min"));
     const yMax = parseFloat(svgElem.getAttribute("data-y-max"));
-    
+
     const plotW = viewBox.width - marginL - marginR;
     const plotH = viewBox.height - marginT - marginB;
-    
+
     // Check if mouse is within the plot area horizontally
     if (svgX < marginL || svgX > viewBox.width - marginR) {
         window.handleTelemetryLeave(evt, svgElem);
         return;
     }
-    
+
     // Calculate the distance value corresponding to svgX
     const pctX = (svgX - marginL) / plotW;
     const targetDist = xMin + pctX * (xMax - xMin);
-    
+
     // Parse telemetry data
     let telemetryData;
     try {
         telemetryData = JSON.parse(svgElem.getAttribute("data-telemetry"));
-    } catch(e) {
+    } catch (e) {
         return;
     }
-    
+
     if (!telemetryData || telemetryData.length === 0) return;
-    
+
     // Find the closest point for each driver
     const activePoints = [];
     telemetryData.forEach((driverData, idx) => {
         const points = driverData.points;
         let closest = points[0];
         let minDist = Math.abs(points[0].d - targetDist);
-        
+
         for (let i = 1; i < points.length; i++) {
             const diff = Math.abs(points[i].d - targetDist);
             if (diff < minDist) {
@@ -778,9 +778,9 @@ window.handleTelemetryHover = function(evt, svgElem) {
             point: closest
         });
     });
-    
+
     if (activePoints.length === 0) return;
-    
+
     // Update guide line position
     const guide = svgElem.querySelector("#telemetry-guide");
     if (guide) {
@@ -788,7 +788,7 @@ window.handleTelemetryHover = function(evt, svgElem) {
         guide.setAttribute("x2", svgX);
         guide.style.display = "block";
     }
-    
+
     // Update driver circle markers
     activePoints.forEach((ap, idx) => {
         const marker = svgElem.querySelector(`.telemetry-marker[data-driver-index="${idx}"]`);
@@ -801,7 +801,7 @@ window.handleTelemetryHover = function(evt, svgElem) {
             marker.style.display = "block";
         }
     });
-    
+
     // Update tooltip content
     const container = svgElem.closest(".interactive-telemetry-plot");
     const tooltip = container.querySelector(".telemetry-tooltip");
@@ -811,7 +811,7 @@ window.handleTelemetryHover = function(evt, svgElem) {
                 Distance: ${Number(activePoints[0].point.d).toFixed(2)} m
             </div>
         `;
-        
+
         activePoints.forEach(ap => {
             tooltipHtml += `
                 <div style="margin: 6px 0; display: flex; flex-direction: column;">
@@ -822,10 +822,10 @@ window.handleTelemetryHover = function(evt, svgElem) {
                 </div>
             `;
         });
-        
+
         tooltip.innerHTML = tooltipHtml;
         tooltip.style.display = "block";
-        
+
         const containerRect = container.getBoundingClientRect();
         const x = evt.clientX - containerRect.left + 15;
         const y = evt.clientY - containerRect.top + 15;
@@ -834,13 +834,13 @@ window.handleTelemetryHover = function(evt, svgElem) {
     }
 };
 
-window.handleTelemetryLeave = function(evt, svgElem) {
+window.handleTelemetryLeave = function (evt, svgElem) {
     const guide = svgElem.querySelector("#telemetry-guide");
     if (guide) guide.style.display = "none";
-    
+
     const markers = svgElem.querySelectorAll(".telemetry-marker");
     markers.forEach(m => m.style.display = "none");
-    
+
     const container = svgElem.closest(".interactive-telemetry-plot");
     const tooltip = container.querySelector(".telemetry-tooltip");
     if (tooltip) tooltip.style.display = "none";
@@ -850,30 +850,30 @@ window.handleTelemetryLeave = function(evt, svgElem) {
 
 function initSimulationState(container) {
     if (container.simInitialized) return;
-    
+
     const svg = container.querySelector('svg');
     if (!svg) return;
-    
+
     let points = [];
     try {
         points = JSON.parse(svg.getAttribute('data-telemetry-points'));
-    } catch(e) {
+    } catch (e) {
         console.error("Failed to parse telemetry points for simulation:", e);
         return;
     }
-    
+
     container.simPoints = points;
     container.simIndex = 0;
     container.simPlaying = false;
     container.simAnimationId = null;
     container.simInitialized = true;
-    
+
     // Force default speed selector to 1x programmatically (handles old chat history)
     const speedSelect = container.querySelector('.sim-speed');
     if (speedSelect) {
         speedSelect.value = "1";
     }
-    
+
     // Configure slider to map 1-to-1 directly to the index of telemetry coordinates (removes jitter!)
     const slider = container.querySelector('.sim-slider');
     if (slider && points.length > 0) {
@@ -882,7 +882,7 @@ function initSimulationState(container) {
         slider.step = "1";
         slider.value = "0";
     }
-    
+
     // Grab or build the simulated car marker in the SVG
     let marker = svg.querySelector('#sim-car-marker');
     if (!marker) {
@@ -902,19 +902,19 @@ function initSimulationState(container) {
 function playSimulation(container) {
     if (container.simPlaying) return;
     container.simPlaying = true;
-    
+
     const playBtn = container.querySelector('.sim-play-btn');
     if (playBtn) playBtn.innerHTML = '<i class="fa-solid fa-pause"></i>';
-    
+
     if (container.simMarker) {
         container.simMarker.style.display = 'block';
     }
-    
+
     let lastTime = null;
-    
+
     function animateStep(timestamp) {
         if (!container.simPlaying) return;
-        
+
         // Skip updates if container is hidden in background
         if (container.getBoundingClientRect().width === 0) {
             container.simAnimationId = requestAnimationFrame(animateStep);
@@ -926,25 +926,25 @@ function playSimulation(container) {
             container.simAnimationId = requestAnimationFrame(animateStep);
             return;
         }
-        
+
         const speedSelect = container.querySelector('.sim-speed');
         const speedMultiplier = speedSelect ? parseFloat(speedSelect.value) : 1;
-        
+
         const elapsed = timestamp - lastTime;
         lastTime = timestamp;
-        
+
         // Target sample rate: ~20Hz (approx 50ms per telemetry index point)
         const deltaIndex = (elapsed / 50) * speedMultiplier;
         container.simIndex += deltaIndex;
-        
+
         if (container.simIndex >= container.simPoints.length) {
             container.simIndex = 0; // Loop the simulation
         }
-        
+
         updateSimUI(container);
         container.simAnimationId = requestAnimationFrame(animateStep);
     }
-    
+
     container.simAnimationId = requestAnimationFrame((t) => {
         lastTime = t;
         animateStep(t);
@@ -964,12 +964,12 @@ function pauseSimulation(container) {
 function sliderManualInput(container, rawIndex) {
     initSimulationState(container);
     if (!container.simPoints || container.simPoints.length === 0) return;
-    
+
     pauseSimulation(container);
     if (container.simMarker) {
         container.simMarker.style.display = 'block';
     }
-    
+
     container.simIndex = Math.max(0, Math.min(container.simPoints.length - 1, parseFloat(rawIndex)));
     updateSimUI(container);
 }
@@ -979,7 +979,7 @@ function updateSimUI(container) {
     const pt1 = container.simPoints[idx];
     const pt2 = container.simPoints[idx + 1] || pt1;
     if (!pt1) return;
-    
+
     const fraction = container.simIndex - idx;
 
     const p1x = parseFloat(pt1.x) || 0;
@@ -992,25 +992,25 @@ function updateSimUI(container) {
 
     const interpSpeed = (parseFloat(pt1.s) || 0) + ((parseFloat(pt2.s) || 0) - (parseFloat(pt1.s) || 0)) * fraction;
     const interpDist = (parseFloat(pt1.d) || 0) + ((parseFloat(pt2.d) || 0) - (parseFloat(pt1.d) || 0)) * fraction;
-    
+
     // Update SVG marker position
     if (container.simMarker) {
         container.simMarker.setAttribute('cx', interpX.toFixed(1));
         container.simMarker.setAttribute('cy', interpY.toFixed(1));
     }
-    
+
     // Update timeline progress slider directly to index
     const slider = container.querySelector('.sim-slider');
     if (slider) {
         slider.value = idx;
     }
-    
+
     // Update real-time telemetry dashboard values
     const speedVal = container.querySelector('.sim-speed-val');
     const gearVal = container.querySelector('.sim-gear-val');
     const distVal = container.querySelector('.sim-distance-val');
     const timeVal = container.querySelector('.sim-time-val');
-    
+
     if (speedVal) speedVal.textContent = interpSpeed.toFixed(2) + " km/h";
     if (gearVal) gearVal.textContent = pt1.g;
     if (distVal) distVal.textContent = interpDist.toFixed(2) + " m";
@@ -1050,7 +1050,7 @@ function initMultiDriverSim(container) {
                 });
             }
         });
-    } catch(e) {
+    } catch (e) {
         console.error('Failed to parse multi-driver telemetry:', e);
         return;
     }
@@ -1101,7 +1101,7 @@ function initMultiDriverSim(container) {
         card.className = 'driver-control-card';
         card.dataset.driver = d.abbr;
         card.style.cssText = `background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-left:4px solid ${d.color}; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:6px; margin-bottom:4px; box-shadow:0 2px 8px rgba(0,0,0,0.15);`;
-        
+
         card.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div>
@@ -1265,7 +1265,7 @@ function initMultiDriverSim(container) {
             universalPlayBtn.className = 'multi-universal-play-btn';
             universalPlayBtn.innerHTML = '<i class="fa-solid fa-play"></i> Universal Play';
             universalPlayBtn.style.cssText = 'background:#e10600;border:none;color:#ffffff;font-family:Outfit,sans-serif;font-weight:600;font-size:11px;padding:6px 14px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all 0.2s;box-shadow:0 2px 8px rgba(225,6,0,0.35);';
-            
+
             if (txtEl) {
                 controlsDiv.insertBefore(universalPlayBtn, txtEl);
             } else {
@@ -1279,7 +1279,7 @@ function initMultiDriverSim(container) {
             universalSpeedSelect = document.createElement('select');
             universalSpeedSelect.className = 'multi-universal-speed';
             universalSpeedSelect.style.cssText = 'background:#1a1b1f !important;border:1px solid rgba(255,255,255,0.2);color:#ffffff !important;border-radius:6px;padding:6px 10px;outline:none;font-size:11px;font-family:Outfit,sans-serif;font-weight:600;cursor:pointer;transition:all 0.2s;min-width:105px;height:28px;';
-            
+
             universalSpeedSelect.innerHTML = `
                 <option value="1" style="background:#1a1b1f;color:#fff;">Speed: 1x</option>
                 <option value="2" style="background:#1a1b1f;color:#fff;">Speed: 2x</option>
@@ -1287,7 +1287,7 @@ function initMultiDriverSim(container) {
                 <option value="5" style="background:#1a1b1f;color:#fff;">Speed: 5x</option>
                 <option value="10" style="background:#1a1b1f;color:#fff;">Speed: 10x</option>
             `;
-            
+
             if (universalPlayBtn.nextSibling) {
                 controlsDiv.insertBefore(universalSpeedSelect, universalPlayBtn.nextSibling);
             } else {
@@ -1376,7 +1376,7 @@ function pauseMultiDriverSim(container) {
 }
 
 // Global helper to initialize newly loaded maps (single + multi driver)
-window.autoplayTrackMaps = function() {
+window.autoplayTrackMaps = function () {
     // Single-driver maps
     const maps = chatHistory.querySelectorAll('.interactive-track-map');
     maps.forEach(map => {
@@ -1412,12 +1412,12 @@ document.addEventListener('click', (e) => {
         }
         return;
     }
-    
+
     // Expand to fullscreen when clicking on the track map layout/SVG or telemetry plot
     if (e.target.closest('.sim-controls') || e.target.closest('.sim-telemetry-dashboard') || e.target.closest('.close-sim-btn') || e.target.closest('button') || e.target.closest('select') || e.target.closest('input') || e.target.closest('.telemetry-tooltip') || e.target.closest('.track-tooltip')) {
         return;
     }
-    
+
     const container = e.target.closest('.interactive-track-map, .interactive-telemetry-plot, .interactive-multi-track-map');
     if (container) {
         // Pause any active simulation in the chat log first
@@ -1426,23 +1426,23 @@ document.addEventListener('click', (e) => {
         } else if (container.classList.contains('interactive-multi-track-map')) {
             pauseMultiDriverSim(container);
         }
-        
+
         const graphModal = document.getElementById('graph-modal');
         const expandedImg = document.getElementById('expanded-graph');
         const interactiveContainer = document.getElementById('modal-interactive-container');
-        
+
         if (graphModal && expandedImg && interactiveContainer) {
             expandedImg.style.display = 'none';
             interactiveContainer.style.display = 'block';
             interactiveContainer.innerHTML = '';
-            
+
             const clone = container.cloneNode(true);
             clone.style.width = '100%';
             clone.style.maxWidth = '100%';
             interactiveContainer.appendChild(clone);
-            
+
             graphModal.style.display = "flex";
-            
+
             if (clone.classList.contains('interactive-track-map')) {
                 initSimulationState(clone);
                 updateSimUI(clone);
@@ -1484,31 +1484,31 @@ function typeHtmlEffect(element, speed = 6) {
             }
         } else {
             for (let child of node.childNodes) {
-                if (child.nodeType === Node.ELEMENT_NODE && 
-                    (child.classList.contains('interactive-track-map') || 
-                     child.classList.contains('interactive-telemetry-plot') ||
-                     child.classList.contains('interactive-multi-track-map') ||
-                     child.classList.contains('graph-container') ||
-                     child.tagName === 'SVG' ||
-                     child.hasAttribute('data-cad3d'))) {
-                    continue; 
+                if (child.nodeType === Node.ELEMENT_NODE &&
+                    (child.classList.contains('interactive-track-map') ||
+                        child.classList.contains('interactive-telemetry-plot') ||
+                        child.classList.contains('interactive-multi-track-map') ||
+                        child.classList.contains('graph-container') ||
+                        child.tagName === 'SVG' ||
+                        child.hasAttribute('data-cad3d'))) {
+                    continue;
                 }
                 textNodes = textNodes.concat(getTextNodes(child));
             }
         }
         return textNodes;
     }
-    
+
     const textNodes = getTextNodes(element);
     const originalTexts = textNodes.map(node => {
         const val = node.nodeValue;
         node.nodeValue = ''; // Clear content temporarily
         return val;
     });
-    
+
     let nodeIndex = 0;
     let charIndex = 0;
-    
+
     function typeNext() {
         if (nodeIndex >= textNodes.length) {
             // Re-enable interactive elements setup once typing completes
@@ -1521,24 +1521,24 @@ function typeHtmlEffect(element, speed = 6) {
             }
             return;
         }
-        
+
         const node = textNodes[nodeIndex];
         const originalText = originalTexts[nodeIndex];
-        
+
         node.nodeValue += originalText[charIndex];
         charIndex++;
-        
+
         // Auto-scroll while typing
         chatHistory.scrollTop = chatHistory.scrollHeight;
-        
+
         if (charIndex >= originalText.length) {
             nodeIndex++;
             charIndex = 0;
         }
-        
+
         setTimeout(typeNext, speed);
     }
-    
+
     typeNext();
 }
 
@@ -1547,9 +1547,9 @@ function typeHtmlEffect(element, speed = 6) {
 function updateAvatarDisplay() {
     const avatar = document.getElementById('user-avatar');
     if (!avatar) return;
-    
+
     const pfp = localStorage.getItem('f1_pfp_url') || 'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))';
-    
+
     if (pfp.startsWith('linear-gradient') || pfp.startsWith('radial-gradient') || pfp.startsWith('#')) {
         avatar.style.background = pfp;
         avatar.innerHTML = '<i class="fa-solid fa-user"></i>';
@@ -1579,7 +1579,7 @@ if (userAvatarBtn) {
                 customPfpInput.value = '';
             }
             selectedPfpVal = curPfp;
-            
+
             // Highlight selected preset if it matches
             const presets = pfpModal.querySelectorAll('.pfp-preset');
             presets.forEach(p => {
@@ -1591,7 +1591,7 @@ if (userAvatarBtn) {
                     p.style.transform = 'none';
                 }
             });
-            
+
             pfpModal.style.display = 'flex';
         }
     });
