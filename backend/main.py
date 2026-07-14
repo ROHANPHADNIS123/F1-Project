@@ -54,63 +54,6 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "F1Admin@2024!")
 
 app = FastAPI(title="F1 AI Assistant API")
 
-# ── Background Job Store ──────────────────────────────────────────────────────
-# Stores slow telemetry/graph jobs so Render's 30s HTTP timeout is never hit.
-# Format: { job_id: {status, result, created_at} }
-job_store: dict = {}
-JOB_TTL_SECONDS = 600  # clean up jobs older than 10 minutes
-
-def cleanup_old_jobs():
-    cutoff = time.time() - JOB_TTL_SECONDS
-    stale = [jid for jid, j in list(job_store.items()) if j.get('created_at', 0) < cutoff]
-    for jid in stale:
-        del job_store[jid]
-
-# Keywords that cause the agent to call session.load(telemetry=True) — these are slow.
-_SLOW_PLOT_KEYWORDS = [
-    "plot", "graph", "chart", "draw", "telemetry", "show speed",
-    "map", "diagram", "layout", "hot lap", "hotlap",
-    "compare hot lap", "compare hotlap", "hot lap comparison",
-    "compare laps", "lap comparison",
-]
-_SLOW_DRIVER_KEYWORDS = {
-    "verstappen", "hamilton", "russell", "norris", "piastri", "leclerc", "sainz",
-    "perez", "alonso", "stroll", "gasly", "ocon", "albon", "sargeant", "ricciardo",
-    "tsunoda", "bottas", "zhou", "magnussen", "hulkenberg", "antonelli", "bearman",
-    "ver", "ham", "rus", "nor", "pia", "lec", "sai", "per", "alo", "str", "gas",
-    "oco", "alb", "sar", "ric", "tsu", "bot", "zho", "mag", "hul", "ant", "bea",
-    "carlos", "max", "lewis", "lando", "charles", "george", "oscar", "pierre",
-    "esteban", "fernando", "lance", "checo", "valtteri", "yuki", "kevin", "nico",
-    "alex", "logan", "daniel", "guanyu", "oliver", "kimi",
-}
-
-def is_slow_query(query: str) -> bool:
-    """Mirrors the agent's is_graph_request detection to pre-identify slow telemetry queries."""
-    q = query.lower()
-    has_plot_kw = any(k in q for k in _SLOW_PLOT_KEYWORDS)
-    words = [w.strip("?,.!:;()\"\'s").lower() for w in query.split()]
-    has_driver = any(w in _SLOW_DRIVER_KEYWORDS for w in words)
-    has_lap = any(w in ("lap", "laps") for w in words)
-    is_analytical = any(k in q for k in ["why", "how", "explain", "reason", "what is", "who won", "who got"])
-    return has_plot_kw or (has_driver and has_lap and not is_analytical)
-
-def _run_agent_job(job_id: str, query: str, history: list,
-                   chat_id: str, user_id: int, first_message: bool, label: str):
-    """Background thread: runs the slow agent call and stores the result in job_store."""
-    try:
-        result = ask_f1_agent(query, history)
-        if result == "__GROQ_RATE_LIMIT__":
-            job_store[job_id]['status'] = 'rate_limit'
-            return
-        add_message(chat_id, "assistant", result)
-        if first_message:
-            update_chat_label(user_id, chat_id, label)
-        job_store[job_id]['status'] = 'done'
-        job_store[job_id]['result'] = result
-    except Exception as e:
-        job_store[job_id]['status'] = 'error'
-        job_store[job_id]['result'] = f"Sorry, an error occurred while processing your request: {e}"
-
 # Initialize database on startup and seed admin account
 @app.on_event("startup")
 async def startup_event():
@@ -236,52 +179,21 @@ async def chat(req: ChatQueryRequest, current_user: dict = Depends(get_current_u
         create_chat(current_user['id'], req.chat_id, "New Chat")
         
     history_list = get_chat_messages(req.chat_id)
-    user_msgs_count = sum(1 for m in history_list if m['role'] == 'user')
-    is_first_message = user_msgs_count == 0
-    chat_label = req.query[:25] + "..." if len(req.query) > 25 else req.query
-
-    # Save user message immediately (always)
-    add_message(req.chat_id, "user", req.query)
-
-    # ── Slow path: telemetry / graph queries ──────────────────────────────────
-    if is_slow_query(req.query):
-        cleanup_old_jobs()
-        job_id = str(uuid.uuid4())
-        job_store[job_id] = {'status': 'pending', 'result': None, 'created_at': time.time()}
-        thread = threading.Thread(
-            target=_run_agent_job,
-            args=(job_id, req.query, history_list, req.chat_id,
-                  current_user['id'], is_first_message, chat_label),
-            daemon=True
-        )
-        thread.start()
-        pending_msg = "⏳ Fetching telemetry & generating your visualization — this can take 30–60 seconds on a cold cache. I'll update you when it's ready!"
-        return {"response": pending_msg, "__job_id__": job_id}
-
-    # ── Fast path: data / text queries ───────────────────────────────────────
     answer = ask_f1_agent(req.query, history_list)
-
+    
     # Detect Groq rate-limit / token exhaustion sentinel
     if answer == "__GROQ_RATE_LIMIT__":
         raise HTTPException(status_code=429, detail="groq_rate_limit")
-
+        
+    add_message(req.chat_id, "user", req.query)
     add_message(req.chat_id, "assistant", answer)
-    if is_first_message:
-        update_chat_label(current_user['id'], req.chat_id, chat_label)
-
+    
+    user_msgs_count = sum(1 for m in history_list if m['role'] == 'user')
+    if user_msgs_count == 0:
+        label = req.query[:25] + "..." if len(req.query) > 25 else req.query
+        update_chat_label(current_user['id'], req.chat_id, label)
+        
     return {"response": answer}
-
-# ── Background Job Polling ────────────────────────────────────────────────────
-
-@app.get("/api/job/{job_id}")
-async def poll_job(job_id: str, current_user: dict = Depends(get_current_user)):
-    """Poll the status of a slow background telemetry/graph job."""
-    job = job_store.get(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found or expired")
-    if job['status'] == 'rate_limit':
-        raise HTTPException(status_code=429, detail="groq_rate_limit")
-    return {"status": job["status"], "result": job.get("result")}
 
 # ── Admin Routes ──────────────────────────────────────────────────────────────
 

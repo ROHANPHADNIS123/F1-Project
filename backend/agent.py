@@ -272,6 +272,10 @@ def generate_telemetry_plot(year: int, grand_prix: str, session_type: str, drive
     """Generates an interactive SVG speed telemetry plot comparison."""
     try:
         session = fastf1.get_session(year, grand_prix, session_type)
+        if session.date and not pd.isna(session.date):
+            session_date = session.date.to_pydatetime().replace(tzinfo=None) if hasattr(session.date, 'to_pydatetime') else session.date.replace(tzinfo=None)
+            if session_date > datetime.datetime.now():
+                return f"The {year} {grand_prix} session is scheduled for the future ({session_date.strftime('%Y-%m-%d')}). Telemetry is not available yet."
         session.load(telemetry=True, weather=False)
         
         # Collect telemetry data for each driver
@@ -578,6 +582,10 @@ def generate_track_map_plot(year: int, grand_prix: str, session_type: str, drive
     """Generates an interactive SVG speed-colored track map for a given driver's fastest lap."""
     try:
         session = fastf1.get_session(year, grand_prix, session_type)
+        if session.date and not pd.isna(session.date):
+            session_date = session.date.to_pydatetime().replace(tzinfo=None) if hasattr(session.date, 'to_pydatetime') else session.date.replace(tzinfo=None)
+            if session_date > datetime.datetime.now():
+                return f"The {year} {grand_prix} session is scheduled for the future ({session_date.strftime('%Y-%m-%d')}). Telemetry is not available yet."
         session.load(telemetry=True, weather=False)
         
         laps = session.laps.pick_drivers(driver)
@@ -797,6 +805,10 @@ def generate_multi_driver_hot_lap(year: int, grand_prix: str, session_type: str,
     """Animated multi-driver hot lap: N coloured dots on a shared circuit with play/scrub/speed controls."""
     try:
         session = fastf1.get_session(year, grand_prix, session_type)
+        if session.date and not pd.isna(session.date):
+            session_date = session.date.to_pydatetime().replace(tzinfo=None) if hasattr(session.date, 'to_pydatetime') else session.date.replace(tzinfo=None)
+            if session_date > datetime.datetime.now():
+                return f"The {year} {grand_prix} session is scheduled for the future ({session_date.strftime('%Y-%m-%d')}). Telemetry is not available yet."
         session.load(telemetry=True, weather=False)
 
         svg_w, svg_h = 800, 520
