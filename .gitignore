@@ -27,3 +27,7 @@ Thumbs.db
 *.db
 *.sqlite3
 
+# Firebase credentials
+*credentials.json
+
+
