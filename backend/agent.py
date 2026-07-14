@@ -15,7 +15,10 @@ import json
 import html
 
 # Set up fastf1 cache
-cache_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'f1_cache'))
+if os.environ.get("RENDER") == "true":
+    cache_dir = "/var/data/f1_cache"
+else:
+    cache_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'f1_cache'))
 if not os.path.exists(cache_dir):
     os.makedirs(cache_dir)
 fastf1.Cache.enable_cache(cache_dir)
