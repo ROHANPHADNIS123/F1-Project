@@ -312,6 +312,100 @@ function renderCurrentChat() {
     }
 }
 
+// ── Background Job Polling ────────────────────────────────────────────────────
+function startJobPolling(jobId, chat) {
+    const POLL_INTERVAL = 4000; // 4 seconds
+    const MAX_POLLS = 60;       // give up after 4 minutes
+    let pollCount = 0;
+
+    // Find the last assistant bubble in the DOM (the ⏳ pending message)
+    function getPendingBubble() {
+        const bubbles = chatHistory.querySelectorAll('.message.assistant');
+        return bubbles.length ? bubbles[bubbles.length - 1] : null;
+    }
+
+    // Update the pending bubble's content with a live countdown indicator
+    function updatePendingBubble(elapsed) {
+        const bubble = getPendingBubble();
+        if (!bubble) return;
+        const inner = bubble.querySelector('.message-content') || bubble;
+        inner.innerHTML = `
+            <div style="display:flex;align-items:center;gap:12px;padding:4px 0;">
+                <div style="
+                    width:18px;height:18px;border-radius:50%;
+                    border:2.5px solid rgba(225,6,0,0.3);
+                    border-top-color:#e10600;
+                    animation:spin 0.9s linear infinite;flex-shrink:0;
+                "></div>
+                <span style="color:#aaa;font-size:0.9rem;">
+                    ⏳ Fetching telemetry &amp; building your visualization&hellip;
+                    <span style="color:#666;font-size:0.8rem;">(${elapsed}s elapsed)</span>
+                </span>
+            </div>
+            <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+        `;
+    }
+
+    const interval = setInterval(async () => {
+        pollCount++;
+        updatePendingBubble(pollCount * (POLL_INTERVAL / 1000));
+
+        if (pollCount > MAX_POLLS) {
+            clearInterval(interval);
+            const bubble = getPendingBubble();
+            if (bubble) {
+                const inner = bubble.querySelector('.message-content') || bubble;
+                inner.textContent = '⚠️ The visualization took too long to generate. Please try again.';
+            }
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/job/${jobId}`, { headers: getHeaders() });
+
+            if (res.status === 429) {
+                clearInterval(interval);
+                const bubble = getPendingBubble();
+                if (bubble) bubble.remove();
+                showGroqRateLimitBanner();
+                return;
+            }
+
+            if (!res.ok) return; // job not found yet, keep polling
+
+            const data = await res.json();
+
+            if (data.status === 'done' && data.result) {
+                clearInterval(interval);
+
+                // Update the in-memory message so reloading the chat shows the real result
+                const lastMsg = chat.messages[chat.messages.length - 1];
+                if (lastMsg && lastMsg.role === 'assistant') {
+                    lastMsg.content = data.result;
+                }
+
+                // Replace the pending bubble with the real rendered result
+                const bubble = getPendingBubble();
+                if (bubble) {
+                    bubble.remove(); // remove pending bubble
+                }
+                addMessage(data.result, false, true);
+
+            } else if (data.status === 'error') {
+                clearInterval(interval);
+                const bubble = getPendingBubble();
+                if (bubble) {
+                    const inner = bubble.querySelector('.message-content') || bubble;
+                    inner.textContent = data.result || '⚠️ An error occurred generating the visualization.';
+                }
+            }
+            // status === 'pending': keep polling
+        } catch (e) {
+            console.warn('Job poll error (will retry):', e);
+        }
+    }, POLL_INTERVAL);
+}
+
 // ── Groq Rate-Limit Banner ────────────────────────────────────────────────────
 function showGroqRateLimitBanner() {
     // Remove any existing banner
@@ -433,16 +527,14 @@ async function handleSend() {
         // Remove typing indicator
         typingIndicator.remove();
 
-        // Append assistant response
+        // Append pending/initial assistant response to chat state
         currentChat.messages.push({ role: 'assistant', content: data.response });
 
         const wasTemp = currentChat.isTemp;
 
-        // If this was a temporary chat, fetch list to update synced ID/label from DB
+        // If this was a temporary chat, sync the chat ID from DB first
         if (wasTemp) {
-            const chatsResponse = await fetch('/api/chats', {
-                headers: getHeaders()
-            });
+            const chatsResponse = await fetch('/api/chats', { headers: getHeaders() });
             if (chatsResponse.ok) {
                 const refreshedChats = await chatsResponse.json();
                 if (refreshedChats.length > 0) {
@@ -454,6 +546,11 @@ async function handleSend() {
         } else {
             renderChatList();
             addMessage(data.response, false, true);
+        }
+
+        // ── Background job: poll until done ──────────────────────────────────
+        if (data.__job_id__) {
+            startJobPolling(data.__job_id__, currentChat);
         }
 
     } catch (error) {
