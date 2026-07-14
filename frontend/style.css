@@ -13,6 +13,7 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    -webkit-tap-highlight-color: transparent !important;
 }
 
 body {
@@ -447,18 +448,30 @@ body {
 }
 
 .close-modal {
-    position: absolute;
-    top: 30px;
-    right: 45px;
-    color: var(--text-secondary);
-    font-size: 40px;
-    font-weight: bold;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 44px;
+    height: 44px;
+    background: #e10600 !important;
+    border: 2px solid #ffffff;
+    color: #ffffff !important;
+    font-size: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    transition: color 0.2s ease;
+    z-index: 999999 !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+    transition: all 0.2s ease;
 }
 
 .close-modal:hover {
-    color: var(--text-primary);
+    background: #e10600;
+    border-color: #e10600;
+    color: #ffffff;
+    transform: scale(1.1);
 }
 
 /* Glassmorphic Tables */
@@ -745,4 +758,266 @@ body {
     width: 0;
     padding: 0;
     overflow: hidden;
+}
+
+/* Custom Range Slider styling for F1 Lap Simulation */
+.sim-slider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.sim-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #e10600;
+    cursor: pointer;
+    border: 2px solid #ffffff;
+    box-shadow: 0 0 5px rgba(225, 6, 0, 0.5);
+    transition: transform 0.1s;
+}
+
+.sim-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+.sim-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #e10600;
+    cursor: pointer;
+    border: 2px solid #ffffff;
+    box-shadow: 0 0 5px rgba(225, 6, 0, 0.5);
+    transition: transform 0.1s;
+}
+
+.sim-slider::-moz-range-thumb:hover {
+    transform: scale(1.2);
+}
+
+/* Cursor and hover interactions on map/telemetry SVGs */
+.interactive-track-map svg,
+.interactive-telemetry-plot svg {
+    cursor: pointer;
+    transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.interactive-track-map svg:hover,
+.interactive-telemetry-plot svg:hover {
+    filter: drop-shadow(0 0 8px rgba(0, 255, 255, 0.15));
+    transform: scale(1.01);
+}
+
+/* ── Mobile & Tablet Responsiveness Media Queries ──────────────────────────── */
+
+@media (max-width: 768px) {
+    .dashboard-container {
+        padding: 10px;
+        gap: 0;
+        position: relative;
+    }
+    
+    /* Make sidebar a floating overlay drawer on mobile screens */
+    .sidebar {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        bottom: 10px;
+        z-index: 1000;
+        height: calc(100% - 20px);
+        background: #0f1115;
+        box-shadow: 5px 0 25px rgba(0, 0, 0, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        width: 260px;
+        min-width: 260px;
+        transition: transform 0.3s ease, opacity 0.3s ease;
+        transform: translateX(0);
+        opacity: 1;
+    }
+    
+    /* Hidden state on mobile - slides off screen completely */
+    .sidebar.collapsed {
+        transform: translateX(-110%);
+        opacity: 0;
+        width: 0;
+        min-width: 0;
+        padding: 0;
+        border: none;
+    }
+    
+    .chat-area {
+        width: 100%;
+    }
+    
+    .chat-header {
+        padding: 12px 16px;
+        gap: 12px;
+    }
+    
+    /* Show hamburger menu toggle on mobile */
+    .mobile-menu-btn {
+        display: flex !important;
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        font-size: 1.2rem;
+        cursor: pointer;
+        padding: 6px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        transition: all 0.2s;
+        flex-shrink: 0;
+    }
+    
+    .mobile-menu-btn:hover {
+        color: var(--f1-red);
+        background: rgba(225, 6, 0, 0.1);
+    }
+    
+    .chat-header h1 {
+        font-size: 1.05rem;
+        flex-grow: 1;
+    }
+    
+    .chat-header .status {
+        font-size: 0.8rem;
+    }
+    
+    .chat-history {
+        gap: 16px;
+        padding: 5px;
+    }
+    
+    .message {
+        max-width: 95%;
+        gap: 10px;
+    }
+    
+    .message-content {
+        padding: 12px 16px;
+        font-size: 0.92rem;
+    }
+    
+    .input-area {
+        padding: 6px 6px 6px 16px;
+    }
+    
+    .input-area input {
+        font-size: 0.92rem;
+    }
+    
+    .send-btn {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+    }
+    
+    /* Adjust simulation layout on mobile devices */
+    .sim-controls {
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: space-between;
+    }
+    
+    .sim-slider {
+        order: 1;
+        width: 100% !important;
+        flex-grow: 1;
+        margin: 5px 0;
+    }
+    
+    .sim-play-btn {
+        width: 28px !important;
+        height: 28px !important;
+    }
+    
+    .sim-speed {
+        padding: 2px 4px !important;
+        font-size: 10px !important;
+    }
+    
+    /* Grid-based simulation telemetry dashboard for phone screens */
+    .sim-telemetry-dashboard {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px 12px;
+        padding: 8px 12px !important;
+        font-size: 10px !important;
+        text-align: left;
+    }
+    
+    .sim-telemetry-dashboard > div {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+        border-bottom: 1px solid rgba(255,255,255,0.02);
+        padding-bottom: 4px;
+    }
+    
+    /* Modal positioning and sizing */
+    .modal {
+        padding: 10px;
+    }
+    
+    .modal-content-container {
+        width: 100% !important;
+    }
+    
+    .close-modal {
+        top: 15px;
+        right: 15px;
+        width: 38px;
+        height: 38px;
+        font-size: 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .chat-header h1 {
+        font-size: 0.95rem;
+    }
+    
+    .chat-header .status {
+        display: none; /* Hide status text on very small phones to make room */
+    }
+}
+/* Interactive widgets hover cursor pointer */
+.interactive-track-map,
+.interactive-telemetry-plot,
+.interactive-multi-track-map {
+    cursor: pointer !important;
+}
+.interactive-track-map svg,
+.interactive-telemetry-plot svg,
+.interactive-multi-track-map svg {
+    cursor: pointer !important;
+}
+
+/* Device-specific responsive modal content container */
+.modal-content-container {
+    width: 96% !important;
+    max-width: 1250px !important;
+    transition: all 0.3s ease;
+}
+@media (max-width: 768px) {
+    .modal-content-container {
+        width: 98% !important;
+        max-width: 100% !important;
+        padding: 5px;
+    }
+}
+@media (min-width: 1400px) {
+    .modal-content-container {
+        max-width: 1400px !important;
+    }
 }

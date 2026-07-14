@@ -336,6 +336,78 @@
             transition: all 0.2s;
         }
         .btn-danger:hover { background: #dc2626; }
+
+        /* ── Mobile & Tablet ── */
+        @media (max-width: 768px) {
+            .topbar {
+                flex-direction: column;
+                gap: 12px;
+                padding: 16px 20px;
+                text-align: center;
+            }
+            .topbar-right {
+                width: 100%;
+                justify-content: center;
+                flex-direction: column;
+                gap: 10px;
+            }
+            .logout-link {
+                width: 100%;
+                justify-content: center;
+            }
+            .content {
+                padding: 16px;
+            }
+            .stats-row {
+                grid-template-columns: 1fr;
+                gap: 12px;
+                margin-bottom: 24px;
+            }
+            .stat-card {
+                padding: 16px 20px;
+            }
+            .section-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 14px;
+                margin-bottom: 16px;
+            }
+            .search-wrap input {
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .table-wrap {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                border-radius: 10px;
+            }
+            table {
+                min-width: 650px;
+            }
+            th, td {
+                padding: 12px 14px;
+            }
+            .modal-box {
+                padding: 20px;
+                width: 95%;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 24px 16px;
+                width: 100%;
+                margin: 10px;
+                box-sizing: border-box;
+            }
+            .brand h1 {
+                font-size: 1.6rem;
+            }
+            .btn-save, .btn-cancel, .btn-danger {
+                padding: 10px 16px;
+                font-size: 0.88rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -366,6 +438,7 @@
             </div>
             <button type="submit" class="btn-primary"><i class="fa-solid fa-shield-halved"></i> &nbsp;Sign In as Admin</button>
         </form>
+        <a href="/" style="display: block; text-align: center; margin-top: 18px; color: var(--muted); font-size: 0.85rem; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'"><i class="fa-solid fa-arrow-left-long"></i> &nbsp;Back to Main Dashboard</a>
     </div>
 </div>
 
@@ -378,6 +451,7 @@
         </div>
         <div class="topbar-right">
             <span class="admin-badge"><i class="fa-solid fa-shield-halved"></i> &nbsp;<span id="admin-name">Admin</span></span>
+            <a href="/" style="margin-right: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; text-decoration: none; color: var(--text); font-size: 0.85rem; font-weight: 600; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'"><i class="fa-solid fa-arrow-left-long"></i> User Dashboard</a>
             <button class="logout-link" onclick="doLogout()"><i class="fa-solid fa-right-from-bracket"></i> Log Out</button>
         </div>
     </div>

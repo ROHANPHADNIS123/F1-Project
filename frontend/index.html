@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>F1 AI Dashboard</title>
-     <link rel="stylesheet" href="/static/style.css?v=9">
+     <link rel="stylesheet" href="/static/style.css?v=18">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -37,7 +37,7 @@
 
             <div class="user-profile">
                 <div class="profile-info">
-                    <div class="avatar"><i class="fa-solid fa-user"></i></div>
+                    <div class="avatar" id="user-avatar" title="Change Avatar" style="cursor: pointer;"><i class="fa-solid fa-user"></i></div>
                     <span id="user-display-name" class="sidebar-text">Guest User</span>
                 </div>
                 <button id="logout-btn" class="logout-btn" title="Log Out">
@@ -49,16 +49,18 @@
         <!-- Main Chat Area -->
         <main class="chat-area">
             <header class="chat-header glass-panel">
+                <button id="mobile-menu-btn" class="mobile-menu-btn" style="display: none;" title="Toggle Menu">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
                 <h1>Race Strategy & Insights</h1>
                 <span class="status"><i class="fa-solid fa-circle icon-green"></i> System Online</span>
             </header>
 
             <div class="chat-history" id="chat-history">
-                <!-- Welcome Message -->
                 <div class="message ai-message">
                     <div class="message-content glass-panel">
                         <p>Welcome to the FastF1 AI Dashboard! 🏎️💨</p>
-                        <p>I can help you analyze race results, lap times, and telemetry. Try asking me something like: <strong>"Who won the 2023 Bahrain Grand Prix?"</strong> or <strong>"What was the fastest lap in the 2023 Monaco race?"</strong></p>
+                        <p>I can help you analyze race results, lap times, telemetry or design components. Try asking me something like: <strong>"Who won the 2023 Bahrain Grand Prix?"</strong> or <strong>"What was the fastest lap in the 2023 Monaco race?"</strong> or <strong>Design a high-downfore front wing for Monza.</strong></p>
                     </div>
                 </div>
             </div>
@@ -74,7 +76,42 @@
     <!-- Modal for Graph Expansion -->
     <div id="graph-modal" class="modal">
         <span class="close-modal">&times;</span>
-        <img class="modal-content" id="expanded-graph">
+        <div class="modal-content-container" style="width: 96%; max-width: 1200px; margin: auto; display: flex; align-items: center; justify-content: center; z-index: 1001;">
+            <img class="modal-content" id="expanded-graph" style="max-width: 100%; max-height: 90vh; display: none;">
+            <div id="modal-interactive-container" style="width: 100%; display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Profile Picture Modal -->
+    <div id="pfp-modal" class="modal">
+        <div class="auth-panel glass-panel" style="width: 380px; padding: 32px; text-align: center; position: relative;">
+            <div class="auth-header" style="margin-bottom: 24px;">
+                <i class="fa-solid fa-user-gear icon-red" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
+                <h2 style="font-size: 1.3rem; font-weight: 700;">Profile Customization</h2>
+                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px;">Set a team gradient or paste a custom avatar URL</p>
+            </div>
+            
+            <div style="font-size: 0.80rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; margin-bottom: 12px; text-align: left;">F1 Team Gradients</div>
+            <div style="display: flex; justify-content: center; gap: 16px; margin-bottom: 24px;">
+                <div class="pfp-preset" data-val="linear-gradient(135deg, #0600ef 0%, #ff1801 100%)" style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #0600ef 0%, #ff1801 100%); cursor: pointer; border: 2px solid transparent; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: transform 0.2s;"></div>
+                <div class="pfp-preset" data-val="linear-gradient(135deg, #ff1801 0%, #1e1e1e 100%)" style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #ff1801 0%, #1e1e1e 100%); cursor: pointer; border: 2px solid transparent; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: transform 0.2s;"></div>
+                <div class="pfp-preset" data-val="linear-gradient(135deg, #ff8700 0%, #1e293b 100%)" style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #ff8700 0%, #1e293b 100%); cursor: pointer; border: 2px solid transparent; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: transform 0.2s;"></div>
+                <div class="pfp-preset" data-val="linear-gradient(135deg, #00a19c 0%, #c0c0c0 100%)" style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #00a19c 0%, #c0c0c0 100%); cursor: pointer; border: 2px solid transparent; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: transform 0.2s;"></div>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 24px; text-align: left;">
+                <label style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Custom Image URL</label>
+                <div class="input-wrapper">
+                    <i class="fa-solid fa-link input-icon"></i>
+                    <input type="text" id="custom-pfp-input" placeholder="https://example.com/avatar.jpg" style="width: 100%; border: none; background: transparent; color: white; outline: none; font-size: 0.95rem;">
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button id="cancel-pfp-btn" class="auth-btn" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: white; flex-grow: 1;">Cancel</button>
+                <button id="save-pfp-btn" class="auth-btn" style="flex-grow: 1;">Save</button>
+            </div>
+        </div>
     </div>
 
     <!-- Auth Modal (Login / Register) -->
@@ -134,6 +171,8 @@
         </div>
     </div>
 
-     <script src="/static/app.js?v=12"></script>
+     <script src="/static/cad3d.js?v=17"></script>
+     <script src="/static/app.js?v=42"></script>
 </body>
 </html>
+

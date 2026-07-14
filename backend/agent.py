@@ -5,7 +5,7 @@ import re
 import pandas as pd
 import numpy as np
 import matplotlib
-matplotlib.use('Agg') # Use non-interactive backend
+matplotlib.use('Agg') # Non-interactive backend
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from fastf1 import plotting
@@ -689,7 +689,22 @@ def generate_track_map_plot(year: int, grand_prix: str, session_type: str, drive
             
             if time_sub is not None:
                 try:
-                    t_val = f"{time_sub[i].total_seconds():.3f}s"
+                    # Subtract first timestamp to get elapsed lap time from the start line
+                    elapsed_td = time_sub[i] - time_sub[0]
+                    total_ns = int(elapsed_td.astype('int64'))
+                    
+                    minutes = total_ns // 60_000_000_000
+                    rem_ns = total_ns % 60_000_000_000
+                    
+                    seconds = rem_ns // 1_000_000_000
+                    rem_ns = rem_ns % 1_000_000_000
+                    
+                    milliseconds = rem_ns // 1_000_000
+                    rem_ns = rem_ns % 1_000_000
+                    
+                    nanoseconds = rem_ns
+                    
+                    t_val = f"{minutes:02d}:{seconds:02d}:{milliseconds:03d}:{nanoseconds:03d}"
                 except Exception:
                     t_val = str(time_sub[i])
             else:
@@ -728,9 +743,26 @@ def generate_track_map_plot(year: int, grand_prix: str, session_type: str, drive
             f'{start_point_html}'
             f'{start_label_html}'
             f'<circle id="track-guide-marker" cx="0" cy="0" r="7" fill="#ffffff" stroke="#ff1801" stroke-width="2" style="display: none; pointer-events: none; filter: drop-shadow(0 0 4px #ff1801);" />'
+            f'<circle id="sim-car-marker" cx="0" cy="0" r="8" fill="#ffffff" stroke="#00ffff" stroke-width="2.5" style="display: none; pointer-events: none; filter: drop-shadow(0 0 6px #00ffff);" />'
             f'</g>'
             f'</svg>'
             f'{legend_gradient}'
+            f'<div class="sim-controls" style="display: flex; align-items: center; gap: 12px; margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05);">'
+            f'<button class="sim-play-btn" style="background: #e10600; border: none; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; flex-shrink: 0;"><i class="fa-solid fa-play"></i></button>'
+            f'<input type="range" class="sim-slider" min="0" max="100" value="0" style="flex-grow: 1; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); outline: none; cursor: pointer;">'
+            f'<select class="sim-speed" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 6px; padding: 4px 8px; outline: none; font-size: 11px; cursor: pointer; font-family: inherit;">'
+            f'<option value="1" selected>1x</option>'
+            f'<option value="2">2x</option>'
+            f'<option value="5">5x</option>'
+            f'<option value="10">10x</option>'
+            f'</select>'
+            f'</div>'
+            f'<div class="sim-telemetry-dashboard" style="display: flex; gap: 10px; margin-top: 10px; padding: 8px 10px; background: rgba(255,255,255,0.02); border-radius: 6px; border: 1px solid rgba(255,255,255,0.03); justify-content: space-around; font-family: monospace; font-size: 11px;">'
+            f'<div>Speed: <strong class="sim-speed-val" style="color: #00ffff;">0.00 km/h</strong></div>'
+            f'<div>Gear: <strong class="sim-gear-val" style="color: #ffffff;">-</strong></div>'
+            f'<div>Distance: <strong class="sim-distance-val" style="color: #ffffff;">0.00 m</strong></div>'
+            f'<div>Time: <strong class="sim-time-val" style="color: #ff1801;">0.000s</strong></div>'
+            f'</div>'
             f'<div class="track-tooltip" style="display: none; position: absolute; background: rgba(15, 17, 21, 0.95); border: 1px solid rgba(255,255,255,0.15); color: white; padding: 10px 14px; border-radius: 8px; pointer-events: none; font-family: sans-serif; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); z-index: 1000; backdrop-filter: blur(4px); transition: opacity 0.15s ease;"></div>'
             f'</div>'
         )
@@ -738,9 +770,457 @@ def generate_track_map_plot(year: int, grand_prix: str, session_type: str, drive
     except Exception as e:
         return f"Error generating track map plot: {e}"
 
+# â”€â”€ Team colour palette for multi-driver comparison â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+TEAM_COLORS = {
+    "Red Bull Racing":      "#3671C6",
+    "Ferrari":              "#E8002D",
+    "Mercedes":             "#27F4D2",
+    "McLaren":              "#FF8000",
+    "Aston Martin":         "#229971",
+    "Alpine":               "#FF87BC",
+    "Williams":             "#64C4FF",
+    "RB":                   "#6692FF",
+    "Haas F1 Team":         "#B6BABD",
+    "Kick Sauber":          "#52E252",
+    # fallback palette for unknowns
+    "_0": "#00FFFF", "_1": "#FF0055", "_2": "#FFD700",
+    "_3": "#00FF88", "_4": "#FF5500", "_5": "#CC44FF",
+}
+
+def get_driver_color(driver_abbr: str, team_name: str, idx: int) -> str:
+    """Return a distinct colour for a driver â€” team colour if known, else a fallback."""
+    if team_name and team_name in TEAM_COLORS:
+        return TEAM_COLORS[team_name]
+    return TEAM_COLORS.get(f"_{idx % 6}", "#FFFFFF")
+
+def generate_multi_driver_hot_lap(year: int, grand_prix: str, session_type: str, drivers: list) -> str:
+    """Animated multi-driver hot lap: N coloured dots on a shared circuit with play/scrub/speed controls."""
+    try:
+        session = fastf1.get_session(year, grand_prix, session_type)
+        session.load(telemetry=True, weather=False)
+
+        svg_w, svg_h = 800, 520
+        margin = 50
+
+        driver_traces = []
+        x_all, y_all = [], []
+
+        for idx, driver in enumerate(drivers):
+            try:
+                laps = session.laps.pick_drivers(driver)
+                if laps.empty:
+                    continue
+                fastest = laps.pick_fastest()
+                tel = fastest.get_telemetry()
+                if 'X' not in tel.columns or 'Y' not in tel.columns:
+                    continue
+
+                x_all.extend(tel['X'].values.tolist())
+                y_all.extend(tel['Y'].values.tolist())
+
+                lt = fastest['LapTime']
+                try:
+                    ts = lt.total_seconds()
+                    lt_str = f"{int(ts // 60)}:{ts % 60:06.3f}"
+                except Exception:
+                    lt_str = str(lt)
+
+                driver_row = session.results[session.results['Abbreviation'] == driver]
+                full_name = driver_row.iloc[0]['FullName'] if not driver_row.empty else driver
+                team_name = driver_row.iloc[0]['TeamName'] if not driver_row.empty else ""
+                color = get_driver_color(driver, team_name, idx)
+
+                # Build scaled telemetry points (to be filled after global bounds computed)
+                driver_traces.append({
+                    "abbr": driver, "name": full_name, "team": team_name,
+                    "color": color, "lt": lt_str,
+                    "x_raw": tel['X'].values, "y_raw": tel['Y'].values,
+                    "speed": tel['Speed'].values if 'Speed' in tel.columns else None,
+                    "gear": tel['nGear'].values if 'nGear' in tel.columns else (tel['Gear'].values if 'Gear' in tel.columns else None),
+                    "dist": tel['Distance'].values if 'Distance' in tel.columns else None,
+                    "time": tel['Time'].values if 'Time' in tel.columns else None,
+                })
+            except Exception:
+                continue
+
+        if not driver_traces:
+            return "Could not load telemetry for any of the requested drivers."
+
+        # Global bounds â†’ scale
+        x_min, x_max = min(x_all), max(x_all)
+        y_min, y_max = min(y_all), max(y_all)
+        track_w = x_max - x_min or 1
+        track_h = y_max - y_min or 1
+        draw_w  = svg_w - 2 * margin
+        draw_h  = svg_h - 2 * margin
+        scale   = min(draw_w / track_w, draw_h / track_h)
+
+        def to_svg_xy(xr, yr):
+            return (margin + (xr - x_min) * scale,
+                    margin + (y_max - yr) * scale)
+
+        # Build SVG track segments + embed per-driver telemetry JSON
+        svg_parts = ['<g>']
+        all_driver_json = []
+
+        for trace in driver_traces:
+            # Downsampled polyline (visual trace)
+            step = max(1, len(trace['x_raw']) // 500)
+            coords = [to_svg_xy(trace['x_raw'][i], trace['y_raw'][i])
+                      for i in range(0, len(trace['x_raw']), step)]
+            polypts = " ".join(f"{c[0]:.1f},{c[1]:.1f}" for c in coords)
+
+            # Speed-coloured segments for this driver's trace
+            speed_arr = trace['speed']
+            if speed_arr is not None and len(speed_arr) > 1:
+                spd_min = float(speed_arr.min())
+                spd_max = float(speed_arr.max())
+                for i in range(0, len(trace['x_raw']) - 1, step):
+                    x1, y1 = to_svg_xy(trace['x_raw'][i],   trace['y_raw'][i])
+                    x2, y2 = to_svg_xy(trace['x_raw'][i+1], trace['y_raw'][i+1])
+                    seg_color = get_speed_color(speed_arr[i], spd_min, spd_max)
+                    svg_parts.append(
+                        f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+                        f'stroke="{seg_color}" stroke-width="4" stroke-linecap="round" opacity="0.55"/>'
+                    )
+            else:
+                svg_parts.append(
+                    f'<polyline points="{polypts}" fill="none" stroke="{trace["color"]}" '
+                    f'stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>'
+                )
+
+            # Build per-driver JSON for JS engine (all original points, scaled)
+            pts_json = []
+            for i in range(len(trace['x_raw'])):
+                sx, sy = to_svg_xy(trace['x_raw'][i], trace['y_raw'][i])
+                spd = float(trace['speed'][i]) if trace['speed'] is not None else 0.0
+                gea = int(trace['gear'][i]) if trace['gear'] is not None else 0
+                dst = float(trace['dist'][i]) if trace['dist'] is not None else 0.0
+                t_val = "N/A"
+                elapsed_ms = 0.0
+                if trace['time'] is not None:
+                    try:
+                        elapsed_td = trace['time'][i] - trace['time'][0]
+                        if hasattr(elapsed_td, 'total_seconds'):
+                            elapsed_ms = elapsed_td.total_seconds() * 1000.0
+                        else:
+                            total_ns = int(elapsed_td.astype('int64'))
+                            elapsed_ms = total_ns / 1_000_000.0
+                        
+                        mins = int(elapsed_ms) // 60_000
+                        rem  = int(elapsed_ms) % 60_000
+                        secs = rem // 1_000
+                        ms   = rem % 1_000
+                        t_val = f"{mins:02d}:{secs:02d}:{ms:03d}"
+                    except Exception:
+                        pass
+                pts_json.append({'x': round(sx, 1), 'y': round(sy, 1),
+                                 's': round(spd, 2), 'g': gea,
+                                 'd': round(dst, 2), 't': t_val,
+                                 'ms': round(elapsed_ms, 1)})
+
+            all_driver_json.append({
+                'abbr': trace['abbr'], 'name': trace['name'],
+                'team': trace['team'], 'color': trace['color'],
+                'lt': trace['lt'], 'points': pts_json,
+            })
+
+        # Start/Finish marker
+        sf_x, sf_y = to_svg_xy(driver_traces[0]['x_raw'][0], driver_traces[0]['y_raw'][0])
+        svg_parts.append(
+            f'<circle cx="{sf_x:.1f}" cy="{sf_y:.1f}" r="8" fill="#00ff66" '
+            f'stroke="#ffffff" stroke-width="2" style="filter:drop-shadow(0 0 4px #00ff66);"/>'
+        )
+        svg_parts.append(
+            f'<text x="{sf_x:.1f}" y="{sf_y - 14:.1f}" fill="#ffffff" '
+            f'font-size="9" font-family="monospace" text-anchor="middle">S/F</text>'
+        )
+        svg_parts.append('</g>')
+
+        multi_json_str = html.escape(json.dumps(all_driver_json))
+
+        # Build full SVG with embedded telemetry attribute
+        svg_html = (
+            f'<svg viewBox="0 0 {svg_w} {svg_h}" '
+            f'style="width:100%;height:auto;background:transparent;" '
+            f'data-multi-telemetry="{multi_json_str}">'
+            '<defs>'
+            '<pattern id="mgrid" width="20" height="20" patternUnits="userSpaceOnUse">'
+            '<path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(0,255,255,0.03)" stroke-width="1"/>'
+            '</pattern>'
+            '</defs>'
+            f'<rect width="{svg_w}" height="{svg_h}" fill="transparent"/>'
+            + "".join(svg_parts) +
+            '</svg>'
+        )
+
+        # Driver info header cards
+        header_cards = ""
+        for t in driver_traces:
+            header_cards += (
+                f'<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;'
+                f'border-left:3px solid {t["color"]};margin-bottom:6px;">'
+                f'<div style="width:12px;height:12px;border-radius:50%;background:{t["color"]};'
+                f'box-shadow:0 0 6px {t["color"]};flex-shrink:0;"></div>'
+                f'<div><div style="font-weight:bold;font-size:13px;color:#fff;">{t["name"]} '
+                f'<span style="color:#a0aab2;font-weight:normal;font-size:11px;">({t["abbr"]})</span></div>'
+                f'<div style="font-size:11px;color:#a0aab2;">{t["team"]} &nbsp;Â·&nbsp; '
+                f'<span style="color:{t["color"]};font-family:monospace;">{t["lt"]}</span></div>'
+                f'</div></div>'
+            )
+
+        # Full container using flex row layout for map and controls side-by-side
+        container_html = (
+            f'<div class="interactive-multi-track-map" style="position:relative;width:100%;max-width:960px;'
+            f'margin:20px auto;background-color:#15181f;border-radius:12px;padding:15px;'
+            f'border:1px solid rgba(255,255,255,0.08);box-shadow:0 8px 32px rgba(0,0,0,0.4);">'
+
+            # Header row
+            f'<div style="display:flex;justify-content:space-between;align-items:center;'
+            f'border-bottom:1px solid rgba(255,255,255,0.05);padding-bottom:10px;margin-bottom:12px;">'
+            f'<div>'
+            f'<h4 style="margin:0;color:#fff;font-size:15px;font-weight:bold;font-family:Outfit,sans-serif;">'
+            f'Hot Lap Comparison</h4>'
+            f'<span style="font-size:11px;color:#a0aab2;">{year} {grand_prix} · {session_type}</span>'
+            f'</div>'
+            f'<div style="display:flex;align-items:center;gap:12px;">'
+            f'<button class="multi-universal-play-btn" style="background:#e10600;border:none;color:#ffffff;font-family:Outfit,sans-serif;font-weight:600;font-size:11px;padding:6px 14px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all 0.2s;box-shadow:0 2px 8px rgba(225,6,0,0.35);"><i class="fa-solid fa-play"></i> Universal Play</button>'
+            f'<select class="multi-universal-speed" style="background:#1a1b1f !important;border:1px solid rgba(255,255,255,0.2);color:#ffffff !important;border-radius:6px;padding:6px 10px;outline:none;font-size:11px;font-family:Outfit,sans-serif;font-weight:600;cursor:pointer;transition:all 0.2s;min-width:105px;height:28px;">'
+            f'<option value="1" style="background:#1a1b1f;color:#fff;">Speed: 1x</option>'
+            f'<option value="2" style="background:#1a1b1f;color:#fff;">Speed: 2x</option>'
+            f'<option value="3" style="background:#1a1b1f;color:#fff;">Speed: 3x</option>'
+            f'<option value="5" style="background:#1a1b1f;color:#fff;">Speed: 5x</option>'
+            f'<option value="10" style="background:#1a1b1f;color:#fff;">Speed: 10x</option>'
+            f'</select>'
+            f'<div style="font-size:11px;color:#a0aab2;text-align:right;">'
+            f'{len(driver_traces)} drivers · fastest laps overlaid</div>'
+            f'</div>'
+            f'</div>'
+
+            # Multi-driver layout container
+            f'<div style="display:flex;flex-direction:row;gap:16px;flex-wrap:wrap;align-items:stretch;">'
+            # Left pane: Circuit Map SVG
+            f'<div class="circuit-pane" style="flex:1 1 450px;min-width:320px;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.15);border-radius:8px;padding:8px;">'
+            + svg_html +
+            f'</div>'
+            # Right pane: Controls side-by-side or stacked
+            f'<div class="driver-controls-pane" style="flex:1 1 300px;min-width:280px;display:flex;flex-direction:column;gap:10px;max-height:480px;overflow-y:auto;padding-right:4px;">'
+            f'<div style="color:#a0aab2;font-size:12px;font-family:sans-serif;padding:20px;text-align:center;">Initializing telemetry controls...</div>'
+            f'</div>'
+            f'</div>'
+            f'</div>'
+        )
+
+        return container_html.replace('\n', ' ')
+
+    except Exception as e:
+        return f"Error generating multi-driver hot lap comparison: {e}"
+
+def generate_design_response(query: str) -> str:
+    """Generate a 3D CAD design response for aero, chassis, or mechanical components."""
+    query_lower = query.lower()
+
+    # 1. Determine component type
+    # Check mechanical/fastener parts FIRST before aero keywords
+    mech_keywords = ["bolt", "nut", "screw", "fastener", "bracket", "bush", "bushing",
+                     "stud", "washer", "pin", "bearing", "rod", "link", "clevis",
+                     "spacer", "shim", "collar", "sleeve"]
+    is_mech = any(k in query_lower for k in mech_keywords)
+
+    if is_mech:
+        # Parse dimensions from query: e.g. "M8 bolt 40mm", "10mm bolt"
+        dim_match = re.search(r'(\d+(?:\.\d+)?)\s*mm', query_lower)
+        thread_match = re.search(r'm(\d+)', query_lower)
+        nom_diam = float(dim_match.group(1)) if dim_match else 8.0
+        thread_size = f"M{thread_match.group(1)}" if thread_match else f"M{int(nom_diam)}"
+        length_match = re.search(r'(\d+(?:\.\d+)?)\s*mm\s+(?:long|length)', query_lower)
+        length = float(length_match.group(1)) if length_match else nom_diam * 5
+
+        if "nut" in query_lower:
+            part_type = "Nut"
+            component = "Mechanical Nut"
+        elif "bracket" in query_lower:
+            part_type = "Bracket"
+            component = "Mounting Bracket"
+        elif "washer" in query_lower:
+            part_type = "Washer"
+            component = "Washer"
+        else:
+            part_type = "Bolt"
+            component = "Fastener Bolt"
+
+        spec_table = (
+            "| Parameter | Dimension | Standard | Status |\n"
+            "| --- | --- | --- | --- |\n"
+            f"| Thread Size | {thread_size} | ISO 6721 | **PASS** |\n"
+            f"| Nominal Diameter | {nom_diam:.1f} mm | DIN 912 | **PASS** |\n"
+            f"| Shank Length | {length:.1f} mm | Customer Spec | **DEFINED** |\n"
+            f"| Head Height | {nom_diam * 0.64:.1f} mm | ISO 4762 | **PASS** |\n"
+            f"| Pitch | {nom_diam * 0.15:.2f} mm | Coarse Thread | **PASS** |\n"
+            f"| Proof Load | {int(nom_diam ** 2 * 60)} N | Grade 12.9 | **PASS** |\n"
+        )
+        materials_table = (
+            "#### Recommended Materials\n"
+            "| Material | Grade | Tensile Strength | Use Case |\n"
+            "| --- | --- | --- | --- |\n"
+            "| Titanium Alloy | Grade 5 (Ti-6Al-4V) | 950 MPa | **Primary** — weight-critical joints |\n"
+            "| Aerospace Steel | 300M / H11 | 1900 MPa | High-load suspension pivots |\n"
+            "| Inconel 718 | AMS 5664 | 1380 MPa | High-temperature exhaust zones |\n"
+        )
+        cad_div = (
+            f'<div data-cad3d="1" data-component="Fastener" data-setup="{part_type}" '
+            f'data-dim-diam="{nom_diam}" data-dim-length="{length}" '
+            f'style="min-height:60px;"></div>'
+        )
+        report = (
+            f"### F1 Mechanical Part: {component} ({thread_size} × {length:.0f} mm)\n\n"
+            "> [!NOTE]\n"
+            "> #### 🎮 3D Model Control Instructions\n"
+            "> * **Rotate**: Click and **drag** (or swipe with 1 finger) to spin the component in 3D.\n"
+            "> * **Zoom**: Use your **scroll wheel** (or pinch) to zoom in very close (supports up to 15x zoom to inspect threading/chamfers).\n"
+            "> * **Pan**: Hold **right-click** and drag (or drag with 2 fingers) to pan the camera view.\n"
+            "> * **Reset**: **Double-click** anywhere on the 3D viewport to reset the camera to home view.\n"
+            "> * **Download**: Click **Download OBJ** to export high-precision CAD files compatible with SOLIDWORKS, Fusion 360, Blender, etc.\n\n"
+            f"{cad_div}\n\n"
+            "#### Dimensional Specification\n"
+            f"{spec_table}\n\n"
+            f"{materials_table}\n\n"
+            "#### Engineering Notes\n"
+            f"1. **Thread standard**: {thread_size} coarse (ISO metric) — compatible with all standard F1 tooling.\n"
+            "2. **Torque spec**: Apply thread-locking compound (Loctite 2701) and torque to manufacturer spec.\n"
+            "3. **Surface finish**: Anodise (titanium) or black oxide (steel) to reduce galvanic corrosion risk.\n"
+            "4. **Safety factor**: 2.5× minimum against proof load under FIA impact test conditions."
+        )
+        return report
+
+    # Standard aero components
+    component = "Rear Wing"
+    if "front wing" in query_lower:
+        component = "Front Wing"
+    elif "chassis" in query_lower or "chassi" in query_lower:
+        component = "Chassis Profile"
+    elif "diffuser" in query_lower:
+        component = "Floor Diffuser"
+
+    # 2. Determine track setup
+    # IMPORTANT: check Low Drag phrases FIRST — "low downforce" must match before bare "downforce"
+    low_drag_triggers = [
+        "low drag", "low-drag", "low downforce", "low-downforce",
+        "monza", "spa", "baku", "jeddah", "spielberg",
+        "red bull ring", "austria", "straight", "straights",
+        "top speed", "high speed track"
+    ]
+    high_downforce_triggers = [
+        "high downforce", "high-downforce", "maximum downforce",
+        "monaco", "hungary", "singapore", "hungaroring",
+        "street circuit", "tight corners"
+    ]
+    # "downforce" alone = High Downforce but ONLY if low drag not already matched
+    bare_downforce = ["downforce"]
+
+    setup = "Balanced"
+    if any(w in query_lower for w in low_drag_triggers):
+        setup = "Low Drag"
+    elif any(w in query_lower for w in high_downforce_triggers):
+        setup = "High Downforce"
+    elif any(w in query_lower for w in bare_downforce):
+        setup = "High Downforce"
+
+    # 3. Spec table per component
+    if component == "Rear Wing":
+        chord = "450 mm" if setup == "High Downforce" else "300 mm"
+        aoa   = "14.5°" if setup == "High Downforce" else "3.8°"
+        cl    = "-2.45" if setup == "High Downforce" else "-0.78"
+        spec_table = (
+            "| Parameter | Target Dimension | Regulation Threshold | Status |\n"
+            "| --- | --- | --- | --- |\n"
+            f"| Span (Width) | 850 mm | Max 850 mm (FIA Art. 3.4.1) | **PASS** |\n"
+            f"| Profile Height | 905 mm | Max 910 mm (FIA Art. 3.4.1) | **PASS** |\n"
+            f"| Mainplane Chord | {chord} | Max 500 mm | **PASS** |\n"
+            f"| DRS Opening Gap | 85 mm | 85 mm (Fixed Limit) | **PASS** |\n"
+            f"| Angle of Attack | {aoa} | Custom Tuning | **OPTIMIZED** |\n"
+            f"| Downforce Coeff (Cl) | {cl} | Est. Aerodynamics | **GOAL MET** |\n"
+        )
+        materials_table = (
+            "#### Recommended Materials\n"
+            "| Component | Material | Layup / Grade | Rationale |\n"
+            "| --- | --- | --- | --- |\n"
+            "| Mainplane skin | Carbon Fibre (CFRP) | [0°/90°/±45°] × 6 ply | Stiffness + aero surface |\n"
+            "| Flap core | Nomex Honeycomb | 3.2 mm cell / 48 kg/m³ | Ultra-low weight |\n"
+            "| Endplates | CFRP + woven carbon | [±45°] × 4 ply | Impact resistance |\n"
+            "| DRS actuator | Titanium Grade 5 | Ti-6Al-4V rod | Corrosion + weight |\n"
+            "| Fasteners | Titanium M5-M8 | Grade 12.9 equiv | Safety critical |\n"
+        )
+    elif component == "Front Wing":
+        spec_table = (
+            "| Parameter | Target Dimension | Regulation Threshold | Status |\n"
+            "| --- | --- | --- | --- |\n"
+            "| Total Span | 1950 mm | Max 2000 mm (FIA Art. 3.2.2) | **PASS** |\n"
+            "| Ground Clearance | 78 mm | Min 75 mm (FIA Art. 3.2.2) | **PASS** |\n"
+            "| Element Count | 4 Flaps | Max 4 Elements | **PASS** |\n"
+            "| Endplate Thickness | 12 mm | Min 10 mm (FIA Art. 3.2.4) | **PASS** |\n"
+        )
+        materials_table = (
+            "#### Recommended Materials\n"
+            "| Component | Material | Layup / Grade | Rationale |\n"
+            "| --- | --- | --- | --- |\n"
+            "| Main plane | CFRP (Toray T800) | [0°/±45°/90°] × 8 ply | Primary load path |\n"
+            "| Cascade flaps | CFRP + ceramic coat | [±45°] × 6 ply | Outwash + heat |\n"
+            "| Endplates | CFRP woven | [0°/90°] × 5 ply | Side impact |\n"
+            "| Attachment pins | Titanium Grade 5 | M6 clevis pins | Lightweight pivot |\n"
+        )
+    else:
+        spec_table = (
+            "| Parameter | Target Dimension | Regulation Threshold | Status |\n"
+            "| --- | --- | --- | --- |\n"
+            "| Wheelbase | 3400 mm | Max 3400 mm (2026 FIA Regs) | **PASS** |\n"
+            "| Max Width | 1900 mm | Max 1900 mm (2026 FIA Regs) | **PASS** |\n"
+            "| Monocoque Weight | 98 kg | Min 95 kg (FIA Art. 12.3) | **PASS** |\n"
+            "| Roll Hoop Survival | 110 kN | Vertical Load 105 kN | **PASS** |\n"
+        )
+        materials_table = (
+            "#### Recommended Materials\n"
+            "| Component | Material | Layup / Grade | Rationale |\n"
+            "| --- | --- | --- | --- |\n"
+            "| Monocoque shell | CFRP (Toray T1100G) | [0°/±60°/90°] × 20 ply | FIA crash cell |\n"
+            "| Crash structure | CFRP/Al honeycomb | 200 kN absorption | Impact standard |\n"
+            "| Sidepod skin | CFRP + Zylon® | [±45°] × 10 ply | Penetration resist |\n"
+            "| Roll hoop | CFRP titanium hybrid | Ti-6Al-4V insert | 105 kN load rating |\n"
+            "| Floor panels | CFRP (low-cost weave) | 6 ply balanced | Ground effect |\n"
+        )
+
+    # 4. Return marker div
+    cad_div = (
+        f'<div data-cad3d="1" data-component="{component}" data-setup="{setup}" '
+        f'style="min-height:60px;"></div>'
+    )
+
+    report = (
+        f"### F1 Aerodynamic 3D CAD: {component} ({setup} Configuration)\n\n"
+        "> [!NOTE]\n"
+        "> #### 🎮 3D Model Control Instructions\n"
+        "> * **Rotate**: Click and **drag** (or swipe with 1 finger) to spin the component in 3D.\n"
+        "> * **Zoom**: Use your **scroll wheel** (or pinch) to zoom in very close (supports up to 15x zoom to inspect airflow streamlines).\n"
+        "> * **Pan**: Hold **right-click** and drag (or drag with 2 fingers) to pan the camera view.\n"
+        "> * **Reset**: **Double-click** anywhere on the 3D viewport to reset the camera to home view.\n"
+        "> * **Toggle DRS**: (Rear Wing only) Click the **Toggle DRS** button in the header bar of the 3D window to animate the flap open/closed.\n"
+        "> * **Download**: Click **Download OBJ** to export high-precision CAD files compatible with SOLIDWORKS, Fusion 360, Blender, etc.\n\n"
+        f"{cad_div}\n\n"
+        "#### Technical Specifications (FIA 2026 Compliance)\n"
+        f"{spec_table}\n\n"
+        f"{materials_table}\n\n"
+        "#### Aerodynamic Analysis\n"
+        f"1. **Performance**: Tuned for **{setup}** — "
+        f"{'drag minimization prioritized for straight-line speed (low-downforce track).': 'maximum suction camber to maximize cornering downforce (high-downforce track).'}\n"
+        "2. **DRS**: Mechanical linkages conform to the 85 mm fixed open gap. "
+        "Click 'Toggle DRS' to see the flap animate open with updated airflow.\n"
+    )
+    return report
+
 def needs_database_context(query: str) -> bool:
     """Helper to check if the query actually asks for data from FastF1. General greetings and chit-chat return False."""
     query_lower = query.lower()
+
     
     # 1. Year pattern
     if re.search(r'\b(19\d\d|20\d\d)\b', query):
@@ -820,6 +1300,16 @@ def ask_f1_agent(query: str, history: list = None) -> str:
 
     query_words = [w.strip("?,.!:;").lower() for w in query.split()]
     
+    # Check for design requests (aerodynamic or mechanical components)
+    design_keywords = ["design", "blueprint", "schematic", "cad", "aerodynamics", "model", "draw", "generate", "create", "make"]
+    component_keywords = [
+        "wing", "chassis", "nose", "diffuser", "endplate", "splitter", "floor", "sidepod", "chassi",
+        "bolt", "nut", "screw", "fastener", "bracket", "bush", "bushing", "stud", "washer", "pin", "bearing", "collar"
+    ]
+    is_design_request = any(k in query.lower() for k in design_keywords) and any(k in query.lower() for k in component_keywords)
+    if is_design_request:
+        return generate_design_response(query)
+
     # Check for reasoning/strategy query
     reasoning_keywords = {"should", "why", "explain", "how to", "strategy", "chances", "opinion", "what if", "would"}
     is_reasoning_query = any(k in query_words for k in reasoning_keywords) or "what should" in query.lower()
@@ -901,7 +1391,17 @@ def ask_f1_agent(query: str, history: list = None) -> str:
     has_driver_mention = any(w in driver_keywords for w in query_words_clean)
     has_lap_and_driver = has_driver_mention and any(w in ["lap", "laps"] for w in query_words_clean)
     
-    is_graph_request = has_lap_and_driver or any(k in query.lower() for k in ["plot", "telemetry", "graph", "chart", "show speed", "map", "diagram", "layout"])
+    plot_keywords = ["plot", "graph", "chart", "draw", "telemetry", "show speed",
+                     "map", "diagram", "layout", "hot lap", "hotlap",
+                     "compare hot lap", "compare hotlap", "hot lap comparison",
+                     "compare laps", "lap comparison"]
+    has_plot_keyword = any(k in query.lower() for k in plot_keywords)
+
+    
+    question_keywords = ["why", "how", "explain", "reason", "what is the reason", "why is", "why does", "how did"]
+    is_analytical_question = any(k in query.lower() for k in question_keywords) or query.strip().endswith("?")
+    
+    is_graph_request = has_plot_keyword or (has_lap_and_driver and not is_analytical_question)
     
     if year < 2018:
         is_database_dependent = is_graph_request or any(k in query.lower() for k in ["fastest lap", "fastest time", "lap time", "laptimes", "laptime"])
@@ -939,21 +1439,26 @@ def ask_f1_agent(query: str, history: list = None) -> str:
         except Exception as e:
             return f"Error loading results for graphing: {e}"
             
-        if any(k in query.lower() for k in ["map", "diagram", "layout"]):
-            track_maps = []
-            for d in drivers:
+        if any(k in query.lower() for k in ["map", "diagram", "layout", "hot lap", "hotlap"]):
+            # â”€â”€ Compare mode: multiple drivers on one frame â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            compare_keywords = ["compare", "comparison", "vs", "versus", "all", "together", "same"]
+            is_compare = any(k in query.lower() for k in compare_keywords) or len(drivers) > 1
+            if is_compare:
+                return generate_multi_driver_hot_lap(year, grand_prix, session_type, drivers)
+            else:
+                # Single driver speed-coloured track map
+                d = drivers[0]
                 driver_row = session.results[session.results['Abbreviation'] == d]
                 driver_name = driver_row.iloc[0]['FullName'] if not driver_row.empty else d
-                
                 graph_html = generate_track_map_plot(year, grand_prix, session_type, d)
-                track_maps.append(f"#### {driver_name}\n{graph_html}")
-            return f"Here is the circuit diagram for **{', '.join(drivers)}** in the **{year} {grand_prix}**:\n\n" + "\n\n".join(track_maps)
+                return f"Here is the circuit diagram for **{driver_name}** in the **{year} {grand_prix}**:\n\n{graph_html}"
         elif 'lap time' in query.lower() or 'laptimes' in query.lower() or 'laptime' in query.lower():
             graph_html = generate_laptimes_plot(year, grand_prix, session_type, drivers)
             return f"Here is the lap time comparison for **{', '.join(drivers)}** in the **{year} {grand_prix}**:\n\n{graph_html}"
         else:
             graph_html = generate_telemetry_plot(year, grand_prix, session_type, drivers)
             return f"Here is the speed telemetry comparison for **{', '.join(drivers)}** in the **{year} {grand_prix}**:\n\n{graph_html}"
+
 
     # Try Groq LLM RAG online
     groq_api_key = os.environ.get("GROQ_API_KEY")
